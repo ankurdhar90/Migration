@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LIQ Platform Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: one column of wide diagram panels, read top to bottom; matches the cutover page's visual vocabulary */
+:root{
+  --paper:#EEF1F4; --panel:#FFFFFF; --tile:#F5F7F9; --ink:#18222F; --muted:#586577; --line:#C3CCD6;
+  --legacy:#7B4FA3; --legacy-soft:#ECE3F5; --snow:#0B7A84; --snow-soft:#DDF1F2;
+  --gate:#A86300; --gate-soft:#FCEFD9; --bad:#B42318; --bad-soft:#FBE4E1; --ok:#2F7D32; --on-accent:#FFFFFF;
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#121920; --panel:#18212B; --tile:#1F2A36; --ink:#E4E9EE; --muted:#9AA6B3; --line:#34414F;
+    --legacy:#B58EDB; --legacy-soft:#2E2540; --snow:#4CC3CC; --snow-soft:#173539;
+    --gate:#E8A23D; --gate-soft:#3A2C14; --bad:#F2796B; --bad-soft:#3D1F1C; --ok:#79C47D; --on-accent:#121920;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121920; --panel:#18212B; --tile:#1F2A36; --ink:#E4E9EE; --muted:#9AA6B3; --line:#34414F;
+  --legacy:#B58EDB; --legacy-soft:#2E2540; --snow:#4CC3CC; --snow-soft:#173539;
+  --gate:#E8A23D; --gate-soft:#3A2C14; --bad:#F2796B; --bad-soft:#3D1F1C; --ok:#79C47D; --on-accent:#121920;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--display); font-size:17px; line-height:1.55; -webkit-font-smoothing:antialiased}
+main{max-width:1180px; margin:0 auto; padding-block:0 72px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.hero{padding:52px 0 4px}
+.eyebrow{font-family:var(--mono); font-size:.8rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 10px}
+h1{font-stretch:72%; font-weight:800; font-size:clamp(2.4rem,6.5vw,4.4rem); line-height:.98; letter-spacing:-.01em; margin:0 0 16px; max-width:15ch; text-wrap:balance}
+.lede{max-width:64ch; color:var(--muted); font-size:1.1rem; margin:0}
+section{padding:48px 0 8px; border-top:1px solid var(--line); margin-top:40px}
+h2{font-stretch:82%; font-weight:750; font-size:clamp(1.5rem,3.3vw,2.15rem); line-height:1.08; margin:0 0 10px; text-wrap:balance}
+p{max-width:68ch; margin:0 0 12px}
+figure{margin:22px 0 6px}
+.fig{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; overflow-x:auto}
+.fig svg{display:block; width:100%; height:auto}
+figcaption{color:var(--muted); font-size:.93rem; margin-top:10px; max-width:74ch}
+
+.dg text{font-family:var(--display)}
+.dg .t{font-size:16px; font-weight:650; fill:var(--ink)}
+.dg .sm{font-size:14px}
+.dg .s{font-size:13px; fill:var(--muted)}
+.dg .lab{font-size:13px; font-weight:700; fill:var(--muted)}
+.dg .m{font-family:var(--mono); font-size:13px; fill:var(--ink)}
+.dg .c{text-anchor:middle}
+.dg .e{text-anchor:end}
+.dg .box{fill:var(--tile); stroke:var(--line); stroke-width:1.5}
+.dg .box.legacy{stroke:var(--legacy); stroke-width:2}
+.dg .box.snow{stroke:var(--snow); stroke-width:2}
+.dg .box.gate{stroke:var(--gate); stroke-width:2; fill:var(--gate-soft)}
+.dg .box.bad{stroke:var(--bad); stroke-width:2; fill:var(--bad-soft)}
+.dg .fill-legacy{fill:var(--legacy-soft); stroke:var(--legacy); stroke-width:1.5}
+.dg .fill-snow{fill:var(--snow-soft); stroke:var(--snow); stroke-width:1.5}
+.dg .fill-tile{fill:var(--tile); stroke:var(--line); stroke-width:1.5}
+.dg .zone{fill:none; stroke:var(--line); stroke-width:1.5; stroke-dasharray:6 6}
+.dg .zone.legacy{stroke:var(--legacy)} .dg .zone.snow{stroke:var(--snow)}
+.dg .wire{fill:none; stroke:var(--ink); stroke-width:1.75}
+.dg .wire.muted{stroke:var(--muted)}
+.dg .wire.gate{stroke:var(--gate); stroke-width:2}
+.dg .wire.bad{stroke:var(--bad)}
+.dg .dash{stroke-dasharray:5 5}
+.dg .f-legacy{fill:var(--legacy)} .dg .f-snow{fill:var(--snow)} .dg .f-gate{fill:var(--gate)} .dg .f-bad{fill:var(--bad)} .dg .f-on{fill:var(--on-accent)}
+.ah-ink{fill:var(--ink)} .ah-muted{fill:var(--muted)} .ah-gate{fill:var(--gate)}
+
+.switch-head{display:flex; flex-wrap:wrap; gap:14px 20px; align-items:center; justify-content:space-between; margin-bottom:12px}
+.toggle{display:inline-flex; flex-wrap:wrap; border:1px solid var(--line); border-radius:999px; padding:4px; background:var(--tile); gap:4px}
+.toggle button{font:inherit; font-weight:650; font-size:.95rem; border:0; background:transparent; color:var(--muted); padding:8px 16px; border-radius:999px; cursor:pointer}
+.toggle button[aria-pressed="true"][data-route="legacy"]{background:var(--legacy); color:var(--on-accent)}
+.toggle button[aria-pressed="true"][data-route="snow"]{background:var(--snow); color:var(--on-accent)}
+.toggle button:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+.state{font-weight:650; margin:0}
+.state .dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; vertical-align:middle}
+.route{fill:none; stroke-width:4.5; stroke-linecap:round; stroke-linejoin:round; transition:stroke .3s, opacity .3s}
+.route.legacy{stroke:var(--legacy)} .route.snow{stroke:var(--snow)}
+.switch[data-route="legacy"] .route.legacy, .switch[data-route="snow"] .route.snow{stroke-dasharray:10 9; animation:flow .9s linear infinite}
+.switch[data-route="legacy"] .route.snow, .switch[data-route="snow"] .route.legacy{stroke:var(--line); stroke-dasharray:2 7}
+.lever{stroke:var(--ink); stroke-width:7; stroke-linecap:round; transform-box:view-box; transform-origin:935px 135px; transition:transform .45s cubic-bezier(.5,1.6,.4,1)}
+.switch[data-route="legacy"] .lever{transform:rotate(180deg)}
+.switch[data-route="snow"] .lever{transform:rotate(90deg)}
+.hub{fill:var(--panel); stroke:var(--ink); stroke-width:3}
+@keyframes flow{to{stroke-dashoffset:-19}}
+
+.legend{display:flex; flex-wrap:wrap; gap:8px 18px; margin:14px 0 0; padding:0; list-style:none; color:var(--muted); font-size:.9rem}
+.legend li{display:flex; align-items:center; gap:8px}
+.legend i{display:inline-block; width:14px; height:14px; border-radius:3px; border:1.5px solid}
+
+.split{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; margin-top:20px}
+.col{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; min-width:0}
+.col h3{margin:0 0 10px; font-size:1.05rem; display:flex; align-items:center; gap:10px}
+.pill{font-size:.75rem; font-weight:700; padding:2px 10px; border-radius:999px}
+.pill.ok{background:var(--snow-soft); color:var(--snow)}
+.pill.as{background:var(--gate-soft); color:var(--gate)}
+.col ul{margin:0; padding:0; list-style:none; display:grid; gap:8px}
+.col li{padding-left:16px; position:relative; font-size:.95rem}
+.col li::before{content:""; position:absolute; left:0; top:.6em; width:7px; height:7px; border-radius:50%; background:var(--line)}
+.col.confirmed li::before{background:var(--snow)}
+.col.assumed li::before{background:var(--gate)}
+
+.qs{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin-top:20px}
+.qs div{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; min-width:0}
+.qs .n{font-stretch:72%; font-weight:800; font-size:2.3rem; line-height:1; color:var(--gate)}
+.qs h3{margin:8px 0 6px; font-size:1.05rem}
+.qs p{color:var(--muted); font-size:.93rem; margin:0}
+footer{color:var(--muted); font-size:.88rem; margin-top:48px}
+@media (max-width:640px){ .hero{padding-top:34px} .fig{padding:12px} }
+@media (prefers-reduced-motion: reduce){ .switch .route{animation:none !important} .lever,.route{transition:none} }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-ink" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-gate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">LIQ migration · platform view</p>
+  <h1>Two platforms, one set of sources</h1>
+  <p class="lede">SQL Server and Snowflake each take in the same source systems and build their own staging, CDM and CDM Enrichment. Snowflake's tier-1 output lands back on the LIQ server, and one alias decides which platform feeds the tier-1 tables.</p>
+
+  <figure>
+    <div class="fig switch" id="switch" data-route="legacy">
+      <div class="switch-head">
+        <div class="toggle" role="group" aria-label="Which platform feeds tier-1">
+          <button type="button" data-route="legacy" aria-pressed="true">Today: SQL Server feeds tier-1</button>
+          <button type="button" data-route="snow" aria-pressed="false">After cutover: Snowflake feeds tier-1</button>
+        </div>
+        <p class="state" id="stateLine"><span class="dot" style="background:var(--legacy)"></span>Legacy route active</p>
+      </div>
+      <svg class="dg" viewBox="0 0 1240 670" style="min-width:900px" role="img" aria-labelledby="archTitle">
+        <title id="archTitle">Shared source systems feed both the SQL Server and Snowflake platforms. Each builds staging, CDM and tier-1 logic. Snowflake output lands in SnowIn tables on the LIQ server. SSIS reads through the CDM alias from either the legacy LIQ procs or the thin LIQ procs, and loads tier-1 through the unchanged LIQ alias.</title>
+
+        <!-- shared sources -->
+        <text class="lab" x="20" y="238">Shared sources</text>
+        <rect class="box" x="20" y="252" width="140" height="50" rx="7"/><text class="t sm c" x="90" y="282">TreasuryBank (?)</text>
+        <rect class="box" x="20" y="316" width="140" height="50" rx="7"/><text class="t sm c" x="90" y="346">SGB</text>
+        <rect class="box" x="20" y="380" width="140" height="50" rx="7"/><text class="t sm c" x="90" y="410">CIF</text>
+        <rect class="box" x="20" y="444" width="140" height="50" rx="7"/><text class="t sm c" x="90" y="474">Other external</text>
+        <line class="wire muted" x1="160" y1="277" x2="185" y2="277"/>
+        <line class="wire muted" x1="160" y1="341" x2="185" y2="341"/>
+        <line class="wire muted" x1="160" y1="405" x2="185" y2="405"/>
+        <line class="wire muted" x1="160" y1="469" x2="185" y2="469"/>
+        <line class="wire" x1="185" y1="135" x2="185" y2="565"/>
+        <line class="wire" x1="185" y1="135" x2="206" y2="135" marker-end="url(#ah-ink)"/>
+        <line class="wire" x1="185" y1="565" x2="206" y2="565" marker-end="url(#ah-ink)"/>
+
+        <!-- SQL Server lane -->
+        <rect class="zone legacy" x="198" y="20" width="560" height="210" rx="10"/>
+        <text class="lab f-legacy" x="214" y="44">SQL Server platform · CDM server (legacy)</text>
+        <rect class="box" x="210" y="85" width="120" height="100" rx="7"/>
+        <text class="t c" x="270" y="140">Staging</text>
+        <line class="wire" x1="330" y1="135" x2="356" y2="135" marker-end="url(#ah-ink)"/>
+        <rect class="box" x="360" y="60" width="200" height="150" rx="7"/>
+        <text class="t c" x="460" y="86">CDM / CDMEN</text>
+        <text class="m c" x="460" y="114">Deposits</text>
+        <text class="m c" x="460" y="138">Loans</text>
+        <text class="m c" x="460" y="162">AssetSec</text>
+        <text class="m c" x="460" y="186" style="fill:var(--muted)">Deposits consol. (?)</text>
+        <line class="wire" x1="560" y1="135" x2="586" y2="135" marker-end="url(#ah-ink)"/>
+        <rect class="box legacy" x="590" y="85" width="150" height="100" rx="7"/>
+        <text class="t c" x="665" y="128">LIQ procs</text>
+        <text class="s c" x="665" y="150">full sourcing logic</text>
+
+        <!-- Snowflake lane -->
+        <rect class="zone snow" x="198" y="440" width="560" height="210" rx="10"/>
+        <text class="lab f-snow" x="214" y="464">Snowflake platform (target)</text>
+        <rect class="box" x="210" y="515" width="120" height="100" rx="7"/>
+        <text class="t c" x="270" y="570">Staging</text>
+        <line class="wire" x1="330" y1="565" x2="356" y2="565" marker-end="url(#ah-ink)"/>
+        <rect class="box" x="360" y="490" width="200" height="150" rx="7"/>
+        <text class="t c" x="460" y="516">CDM / CDEN</text>
+        <text class="m c" x="460" y="544">Deposits</text>
+        <text class="m c" x="460" y="568">Loans</text>
+        <text class="m c" x="460" y="592">AssetSec</text>
+        <text class="m c" x="460" y="616" style="fill:var(--muted)">…</text>
+        <line class="wire" x1="560" y1="565" x2="586" y2="565" marker-end="url(#ah-ink)"/>
+        <rect class="box snow" x="590" y="515" width="150" height="100" rx="7"/>
+        <text class="t c" x="665" y="558">Liq tier-1</text>
+        <text class="s c" x="665" y="580">rebuilt, no history</text>
+
+        <!-- landing tool -->
+        <line class="wire" x1="740" y1="565" x2="856" y2="565" marker-end="url(#ah-ink)"/>
+        <text class="s c" x="790" y="552">DMNA tool (?)</text>
+
+        <!-- LIQ server -->
+        <rect class="zone" x="830" y="250" width="400" height="400" rx="10"/>
+        <text class="lab" x="846" y="274">LIQ server (DAL) · LIQUIDITY db</text>
+        <rect class="box snow" x="860" y="320" width="150" height="80" rx="7"/>
+        <text class="t c" x="935" y="355">LIQ procs</text>
+        <text class="s c" x="935" y="377">thin: read SnowIn_*</text>
+        <rect class="box snow" x="860" y="520" width="150" height="90" rx="7"/>
+        <text class="t c" x="935" y="558">SnowIn_*</text>
+        <text class="s c" x="935" y="580">landed tier-1 data</text>
+        <line class="wire" x1="935" y1="520" x2="935" y2="404" marker-end="url(#ah-ink)"/>
+
+        <rect class="box" x="1050" y="320" width="160" height="80" rx="7"/>
+        <text class="t c" x="1130" y="355">Tier-1 tables</text>
+        <text class="s c" x="1130" y="377">history retained</text>
+        <line class="wire" x1="1130" y1="400" x2="1130" y2="426" marker-end="url(#ah-ink)"/>
+        <rect class="box" x="1050" y="430" width="160" height="70" rx="7"/>
+        <text class="t sm c" x="1130" y="460">Liquidity Enrichment</text>
+        <text class="s c" x="1130" y="480">and other modules</text>
+        <line class="wire" x1="1130" y1="500" x2="1130" y2="536" marker-end="url(#ah-ink)"/>
+        <rect class="box" x="1050" y="540" width="160" height="70" rx="7"/>
+        <text class="t sm c" x="1130" y="572">Liquidity reports</text>
+        <text class="s c" x="1130" y="592">unchanged</text>
+
+        <!-- SSIS -->
+        <rect class="box" x="1040" y="95" width="170" height="80" rx="8"/>
+        <text class="t c" x="1125" y="130">SSIS packages</text>
+        <text class="s c" x="1125" y="152">run by Control-M</text>
+        <line class="wire" x1="1125" y1="175" x2="1125" y2="316" marker-end="url(#ah-ink)"/>
+        <text class="s" x="1133" y="236">LIQ alias</text>
+        <text class="s" x="1133" y="254">unchanged</text>
+
+        <!-- routes and switch -->
+        <path class="route legacy" d="M935,135 H744"/>
+        <path class="route snow" d="M935,135 V316"/>
+        <text class="lab" x="790" y="122" style="fill:var(--legacy)">today</text>
+        <text class="lab" x="947" y="226" style="fill:var(--snow)">after cutover</text>
+        <line class="wire" x1="1040" y1="135" x2="945" y2="135"/>
+        <text class="lab c" x="992" y="122">CDM alias</text>
+        <line class="lever" x1="935" y1="135" x2="971" y2="135"/>
+        <circle class="hub" cx="935" cy="135" r="10"/>
+      </svg>
+    </div>
+    <figcaption id="switchCaption" aria-live="polite">Today the CDM alias points at the CDM server. SSIS runs the full-logic LIQ procs on SQL Server's CDM and loads tier-1. Snowflake builds in parallel and its output only lands in SnowIn_* for comparison.</figcaption>
+  </figure>
+  <ul class="legend">
+    <li><i style="border-color:var(--legacy);background:var(--legacy-soft)"></i>SQL Server platform</li>
+    <li><i style="border-color:var(--snow);background:var(--snow-soft)"></i>Snowflake platform and bridge</li>
+    <li><i style="border-color:var(--line);background:var(--tile)"></i>Unchanged</li>
+    <li>(?) label read from the sketch, not yet confirmed</li>
+  </ul>
+</header>
+
+<section aria-labelledby="h-boundary">
+  <h2 id="h-boundary">Where the platform boundary sits</h2>
+  <p>This is a platform migration, and the tier-1 cutover moves the boundary to just after tier-1. The SnowIn_* tables and the alias are the bridge across it.</p>
+  <figure>
+    <div class="fig">
+      <svg class="dg" viewBox="0 0 1110 360" style="min-width:820px" role="img" aria-label="Today every layer is on SQL Server. After the tier-1 cutover, staging through tier-1 build on Snowflake and downstream stays on SQL Server. Later phases, assumed, move downstream too.">
+        <text class="lab c" x="270" y="24">Sources</text>
+        <text class="lab c" x="420" y="24">Staging</text>
+        <text class="lab c" x="570" y="24">CDM / CDEN</text>
+        <text class="lab c" x="720" y="24">Tier-1</text>
+        <text class="lab c" x="870" y="24">Enrichment</text>
+        <text class="lab c" x="1020" y="24">Reports</text>
+
+        <!-- Today -->
+        <text class="t" x="10" y="72">Today</text>
+        <text class="s" x="10" y="92">all on SQL Server</text>
+        <rect class="fill-tile" x="200" y="45" width="140" height="56" rx="6"/>
+        <rect class="fill-legacy" x="350" y="45" width="140" height="56" rx="6"/>
+        <rect class="fill-legacy" x="500" y="45" width="140" height="56" rx="6"/>
+        <rect class="fill-legacy" x="650" y="45" width="140" height="56" rx="6"/>
+        <rect class="fill-legacy" x="800" y="45" width="140" height="56" rx="6"/>
+        <rect class="fill-legacy" x="950" y="45" width="140" height="56" rx="6"/>
+
+        <!-- Phase 1 -->
+        <text class="t" x="10" y="172">Tier-1 cutover</text>
+        <text class="s" x="10" y="192">this project</text>
+        <rect class="fill-tile" x="200" y="145" width="140" height="56" rx="6"/>
+        <rect class="fill-snow" x="350" y="145" width="140" height="56" rx="6"/>
+        <rect class="fill-snow" x="500" y="145" width="140" height="56" rx="6"/>
+        <rect class="fill-snow" x="650" y="145" width="140" height="56" rx="6"/>
+        <rect class="fill-legacy" x="800" y="145" width="140" height="56" rx="6"/>
+        <rect class="fill-legacy" x="950" y="145" width="140" height="56" rx="6"/>
+        <line x1="795" y1="132" x2="795" y2="214" style="stroke:var(--gate)" stroke-width="3"/>
+        <text class="s c" x="795" y="234" style="fill:var(--gate)">bridge: SnowIn_* + alias</text>
+        <text class="s c" x="420" y="178" style="fill:var(--snow)">legacy kept fed</text>
+
+        <!-- Later -->
+        <text class="t" x="10" y="292">Later phases</text>
+        <text class="s" x="10" y="312" style="fill:var(--gate)">assumed, not confirmed</text>
+        <g opacity=".75">
+          <rect class="fill-tile" x="200" y="265" width="140" height="56" rx="6" stroke-dasharray="5 4"/>
+          <rect class="fill-snow" x="350" y="265" width="140" height="56" rx="6" stroke-dasharray="5 4"/>
+          <rect class="fill-snow" x="500" y="265" width="140" height="56" rx="6" stroke-dasharray="5 4"/>
+          <rect class="fill-snow" x="650" y="265" width="140" height="56" rx="6" stroke-dasharray="5 4"/>
+          <rect class="fill-snow" x="800" y="265" width="140" height="56" rx="6" stroke-dasharray="5 4"/>
+          <rect class="fill-snow" x="950" y="265" width="140" height="56" rx="6" stroke-dasharray="5 4"/>
+        </g>
+        <text class="s c" x="870" y="345">bridge retired once downstream moves</text>
+      </svg>
+    </div>
+    <figcaption>If downstream moves later, the SnowIn_* and alias bridge is temporary. That affects how much to invest in it, and it affects the key decision below.</figcaption>
+  </figure>
+</section>
+
+<section aria-labelledby="h-recon">
+  <h2 id="h-recon">Reconcile at four levels, not three</h2>
+  <p>Both platforms build their own CDM from the sources. A tier-1 break can come from a CDM difference upstream, so compare CDM first. That tells you whether a break is a data lineage problem or a tier-1 logic problem.</p>
+  <figure>
+    <div class="fig">
+      <svg class="dg" viewBox="0 0 1060 350" style="min-width:780px" role="img" aria-label="SQL Server and Snowflake compared at four points: CDM, tier-1 output, tier-1 tables and reports.">
+        <text class="lab f-legacy" x="10" y="78">SQL Server</text>
+        <text class="s" x="10" y="96">production</text>
+        <text class="lab f-snow" x="10" y="268">Snowflake</text>
+        <text class="s" x="10" y="286">route under test</text>
+
+        <rect class="box legacy" x="150" y="45" width="190" height="72" rx="7"/>
+        <text class="t c" x="245" y="78">CDM / CDMEN</text><text class="s c" x="245" y="99">SQL Server build</text>
+        <rect class="box legacy" x="380" y="45" width="190" height="72" rx="7"/>
+        <text class="t c" x="475" y="78">LIQ procs output</text><text class="s c" x="475" y="99">legacy logic</text>
+        <rect class="box" x="610" y="45" width="190" height="72" rx="7"/>
+        <text class="t c" x="705" y="78">Tier-1 tables</text><text class="s c" x="705" y="99">production</text>
+        <rect class="box" x="840" y="45" width="200" height="72" rx="7"/>
+        <text class="t c" x="940" y="78">Liquidity reports</text><text class="s c" x="940" y="99">production</text>
+        <line class="wire" x1="340" y1="81" x2="376" y2="81" marker-end="url(#ah-ink)"/>
+        <line class="wire" x1="570" y1="81" x2="606" y2="81" marker-end="url(#ah-ink)"/>
+        <line class="wire" x1="800" y1="81" x2="836" y2="81" marker-end="url(#ah-ink)"/>
+
+        <rect class="box snow" x="150" y="235" width="190" height="72" rx="7"/>
+        <text class="t c" x="245" y="268">CDM / CDEN</text><text class="s c" x="245" y="289">Snowflake build</text>
+        <rect class="box snow" x="380" y="235" width="190" height="72" rx="7"/>
+        <text class="t c" x="475" y="268">SnowIn_* landing</text><text class="s c" x="475" y="289">Snowflake tier-1</text>
+        <rect class="box" x="610" y="235" width="190" height="72" rx="7"/>
+        <text class="t c" x="705" y="268">Tier-1 tables</text><text class="s c" x="705" y="289">shadow copy</text>
+        <rect class="box" x="840" y="235" width="200" height="72" rx="7"/>
+        <text class="t c" x="940" y="268">Liquidity reports</text><text class="s c" x="940" y="289">shadow copy</text>
+        <line class="wire" x1="340" y1="271" x2="376" y2="271" marker-end="url(#ah-ink)"/>
+        <line class="wire" x1="570" y1="271" x2="606" y2="271" marker-end="url(#ah-ink)"/>
+        <line class="wire" x1="800" y1="271" x2="836" y2="271" marker-end="url(#ah-ink)"/>
+
+        <line class="wire muted dash" x1="245" y1="117" x2="245" y2="235"/>
+        <circle cx="245" cy="176" r="17" class="f-gate"/><text class="t c f-on" x="245" y="182">1</text>
+        <text class="s" x="270" y="172">CDM</text><text class="s" x="270" y="189" style="fill:var(--gate)">new</text>
+        <line class="wire muted dash" x1="475" y1="117" x2="475" y2="235"/>
+        <circle cx="475" cy="176" r="17" class="f-gate"/><text class="t c f-on" x="475" y="182">2</text>
+        <text class="s" x="500" y="181">landing</text>
+        <line class="wire muted dash" x1="705" y1="117" x2="705" y2="235"/>
+        <circle cx="705" cy="176" r="17" class="f-gate"/><text class="t c f-on" x="705" y="182">3</text>
+        <text class="s" x="730" y="181">tier-1</text>
+        <line class="wire muted dash" x1="940" y1="117" x2="940" y2="235"/>
+        <circle cx="940" cy="176" r="17" class="f-gate"/><text class="t c f-on" x="940" y="182">4</text>
+        <text class="s" x="965" y="181">reports</text>
+
+        <text class="s" x="150" y="338">Break at 1 → source timing or CDM rules. Clean at 1, break at 2 → tier-1 logic. Clean at 2, break at 3 → the load or keys.</text>
+      </svg>
+    </div>
+    <figcaption>Triage reads left to right: the first level that breaks tells you where to look. Compare on business keys, never surrogate keys.</figcaption>
+  </figure>
+</section>
+
+<section aria-labelledby="h-status">
+  <h2 id="h-status">Confirmed and assumed</h2>
+  <div class="split">
+    <div class="col confirmed">
+      <h3><span class="pill ok">Confirmed</span>by you</h3>
+      <ul>
+        <li>Snowflake takes in the same source systems as SQL Server.</li>
+        <li>This is a platform migration, and tier-1 is in scope now.</li>
+        <li>Downstream (Enrichment, other modules, reports) stays on SQL Server for this cutover.</li>
+        <li>Snowflake output lands in SnowIn_* on the LIQ server.</li>
+        <li>New LIQ procs on the LIQ server, with identical names and signatures.</li>
+        <li>Cutover is a client-alias repoint, and rollback points it back.</li>
+        <li>The delete step, the LIQ alias and the tier-1 tables are unchanged, and tier-1 keeps history.</li>
+      </ul>
+    </div>
+    <div class="col assumed">
+      <h3><span class="pill as">Assumed</span>not yet confirmed</h3>
+      <ul>
+        <li>SSIS has two connections, and only the CDM alias moves.</li>
+        <li>SSIS reads the proc result set, so the output columns must match exactly.</li>
+        <li>The DMNA / DTMA tool moves Snowflake tier-1 into SnowIn_*.</li>
+        <li>Labels read from the sketch: TreasuryBank, consolidated deposits.</li>
+        <li>Later phases move downstream to Snowflake.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h-q">
+  <h2 id="h-q">Questions this view raises</h2>
+  <div class="qs">
+    <div><span class="n">1</span><h3>Same snapshot of sources?</h3><p>Do both platforms pick up the same file or extract for a business date? If not, level-1 breaks are timing, not defects, and the data gate has to check source completeness on both sides.</p></div>
+    <div><span class="n">2</span><h3>Keys with Snowflake as the end state</h3><p>Translating Snowflake keys into SQL Server's key space builds a mapping you unwind when downstream moves. Generating keys on load in tier-1, or seeding Snowflake from SQL Server's key ranges, survives both phases. Where are keys generated today?</p></div>
+    <div><span class="n">3</span><h3>What is the DMNA tool?</h3><p>Is it in-house or third party, and does Control-M schedule it? Its completion is the in-condition for the data gate.</p></div>
+    <div><span class="n">4</span><h3>How long can legacy CDM stay fed?</h3><p>Rollback depends on the SQL Server chain running daily. If other consumers leave CDM, or the CDM team plans to decommission it, the rollback window has a hard end date.</p></div>
+    <div><span class="n">5</span><h3>Bridge or permanent?</h3><p>If downstream follows, the thin procs and SnowIn_* are scaffolding. Keep them simple and avoid building logic into them that a later phase has to move again.</p></div>
+  </div>
+</section>
+
+<footer>High-level architecture for the LIQ migration, drawn from your notebook sketch. Companion to the Liquidity tier-1 cutover page.</footer>
+</main>
+
+<script>
+(function(){
+  var fig = document.getElementById('switch');
+  var buttons = fig.querySelectorAll('.toggle button');
+  var stateLine = document.getElementById('stateLine');
+  var caption = document.getElementById('switchCaption');
+  var copy = {
+    legacy: {state:'Legacy route active', color:'var(--legacy)',
+      caption:"Today the CDM alias points at the CDM server. SSIS runs the full-logic LIQ procs on SQL Server's CDM and loads tier-1. Snowflake builds in parallel and its output only lands in SnowIn_* for comparison."},
+    snow: {state:'Snowflake route active', color:'var(--snow)',
+      caption:"After cutover the CDM alias points at the LIQ server. The same SSIS packages call the thin LIQ procs, which read SnowIn_*. The SQL Server chain keeps running so rollback stays possible."}
+  };
+  function setRoute(route){
+    fig.setAttribute('data-route', route);
+    buttons.forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.route === route)); });
+    stateLine.textContent = '';
+    var dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = copy[route].color;
+    stateLine.appendChild(dot); stateLine.appendChild(document.createTextNode(copy[route].state));
+    caption.textContent = copy[route].caption;
+  }
+  buttons.forEach(function(b){ b.addEventListener('click', function(){ setRoute(b.dataset.route); }); });
+})();
+</script>
+
+</html>

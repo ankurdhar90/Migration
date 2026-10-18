@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Migration Case Playbooks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: one column of wide diagram panels, read top to bottom; matches the cutover page's visual vocabulary */
+:root{
+  --paper:#EEF1F4; --panel:#FFFFFF; --tile:#F5F7F9; --ink:#18222F; --muted:#586577; --line:#C3CCD6;
+  --legacy:#7B4FA3; --legacy-soft:#ECE3F5; --snow:#0B7A84; --snow-soft:#DDF1F2;
+  --gate:#A86300; --gate-soft:#FCEFD9; --bad:#B42318; --bad-soft:#FBE4E1; --ok:#2F7D32; --on-accent:#FFFFFF;
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#121920; --panel:#18212B; --tile:#1F2A36; --ink:#E4E9EE; --muted:#9AA6B3; --line:#34414F;
+    --legacy:#B58EDB; --legacy-soft:#2E2540; --snow:#4CC3CC; --snow-soft:#173539;
+    --gate:#E8A23D; --gate-soft:#3A2C14; --bad:#F2796B; --bad-soft:#3D1F1C; --ok:#79C47D; --on-accent:#121920;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121920; --panel:#18212B; --tile:#1F2A36; --ink:#E4E9EE; --muted:#9AA6B3; --line:#34414F;
+  --legacy:#B58EDB; --legacy-soft:#2E2540; --snow:#4CC3CC; --snow-soft:#173539;
+  --gate:#E8A23D; --gate-soft:#3A2C14; --bad:#F2796B; --bad-soft:#3D1F1C; --ok:#79C47D; --on-accent:#121920;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--display); font-size:17px; line-height:1.55; -webkit-font-smoothing:antialiased}
+main{max-width:1180px; margin:0 auto; padding-block:0 72px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.hero{padding:52px 0 4px}
+.eyebrow{font-family:var(--mono); font-size:.8rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 10px}
+h1{font-stretch:72%; font-weight:800; font-size:clamp(2.4rem,6.5vw,4.4rem); line-height:.98; letter-spacing:-.01em; margin:0 0 16px; max-width:15ch; text-wrap:balance}
+.lede{max-width:64ch; color:var(--muted); font-size:1.1rem; margin:0}
+section{padding:48px 0 8px; border-top:1px solid var(--line); margin-top:40px}
+h2{font-stretch:82%; font-weight:750; font-size:clamp(1.5rem,3.3vw,2.15rem); line-height:1.08; margin:0 0 10px; text-wrap:balance}
+p{max-width:68ch; margin:0 0 12px}
+figure{margin:22px 0 6px}
+.fig{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; overflow-x:auto}
+.fig svg{display:block; width:100%; height:auto}
+figcaption{color:var(--muted); font-size:.93rem; margin-top:10px; max-width:74ch}
+
+.dg text{font-family:var(--display)}
+.dg .t{font-size:16px; font-weight:650; fill:var(--ink)}
+.dg .sm{font-size:14px}
+.dg .s{font-size:13px; fill:var(--muted)}
+.dg .lab{font-size:13px; font-weight:700; fill:var(--muted)}
+.dg .m{font-family:var(--mono); font-size:13px; fill:var(--ink)}
+.dg .c{text-anchor:middle}
+.dg .e{text-anchor:end}
+.dg .box{fill:var(--tile); stroke:var(--line); stroke-width:1.5}
+.dg .box.legacy{stroke:var(--legacy); stroke-width:2}
+.dg .box.snow{stroke:var(--snow); stroke-width:2}
+.dg .box.gate{stroke:var(--gate); stroke-width:2; fill:var(--gate-soft)}
+.dg .box.bad{stroke:var(--bad); stroke-width:2; fill:var(--bad-soft)}
+.dg .fill-legacy{fill:var(--legacy-soft); stroke:var(--legacy); stroke-width:1.5}
+.dg .fill-snow{fill:var(--snow-soft); stroke:var(--snow); stroke-width:1.5}
+.dg .fill-tile{fill:var(--tile); stroke:var(--line); stroke-width:1.5}
+.dg .zone{fill:none; stroke:var(--line); stroke-width:1.5; stroke-dasharray:6 6}
+.dg .zone.legacy{stroke:var(--legacy)} .dg .zone.snow{stroke:var(--snow)}
+.dg .wire{fill:none; stroke:var(--ink); stroke-width:1.75}
+.dg .wire.muted{stroke:var(--muted)}
+.dg .wire.gate{stroke:var(--gate); stroke-width:2}
+.dg .wire.bad{stroke:var(--bad)}
+.dg .dash{stroke-dasharray:5 5}
+.dg .f-legacy{fill:var(--legacy)} .dg .f-snow{fill:var(--snow)} .dg .f-gate{fill:var(--gate)} .dg .f-bad{fill:var(--bad)} .dg .f-on{fill:var(--on-accent)}
+.ah-ink{fill:var(--ink)} .ah-muted{fill:var(--muted)} .ah-gate{fill:var(--gate)}
+
+.switch-head{display:flex; flex-wrap:wrap; gap:14px 20px; align-items:center; justify-content:space-between; margin-bottom:12px}
+.toggle{display:inline-flex; flex-wrap:wrap; border:1px solid var(--line); border-radius:999px; padding:4px; background:var(--tile); gap:4px}
+.toggle button{font:inherit; font-weight:650; font-size:.95rem; border:0; background:transparent; color:var(--muted); padding:8px 16px; border-radius:999px; cursor:pointer}
+.toggle button[aria-pressed="true"][data-route="legacy"]{background:var(--legacy); color:var(--on-accent)}
+.toggle button[aria-pressed="true"][data-route="snow"]{background:var(--snow); color:var(--on-accent)}
+.toggle button:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+.state{font-weight:650; margin:0}
+.state .dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; vertical-align:middle}
+.route{fill:none; stroke-width:4.5; stroke-linecap:round; stroke-linejoin:round; transition:stroke .3s, opacity .3s}
+.route.legacy{stroke:var(--legacy)} .route.snow{stroke:var(--snow)}
+.switch[data-route="legacy"] .route.legacy, .switch[data-route="snow"] .route.snow{stroke-dasharray:10 9; animation:flow .9s linear infinite}
+.switch[data-route="legacy"] .route.snow, .switch[data-route="snow"] .route.legacy{stroke:var(--line); stroke-dasharray:2 7}
+.lever{stroke:var(--ink); stroke-width:7; stroke-linecap:round; transform-box:view-box; transform-origin:935px 135px; transition:transform .45s cubic-bezier(.5,1.6,.4,1)}
+.switch[data-route="legacy"] .lever{transform:rotate(180deg)}
+.switch[data-route="snow"] .lever{transform:rotate(90deg)}
+.hub{fill:var(--panel); stroke:var(--ink); stroke-width:3}
+@keyframes flow{to{stroke-dashoffset:-19}}
+
+.legend{display:flex; flex-wrap:wrap; gap:8px 18px; margin:14px 0 0; padding:0; list-style:none; color:var(--muted); font-size:.9rem}
+.legend li{display:flex; align-items:center; gap:8px}
+.legend i{display:inline-block; width:14px; height:14px; border-radius:3px; border:1.5px solid}
+
+.split{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; margin-top:20px}
+.col{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; min-width:0}
+.col h3{margin:0 0 10px; font-size:1.05rem; display:flex; align-items:center; gap:10px}
+.pill{font-size:.75rem; font-weight:700; padding:2px 10px; border-radius:999px}
+.pill.ok{background:var(--snow-soft); color:var(--snow)}
+.pill.as{background:var(--gate-soft); color:var(--gate)}
+.col ul{margin:0; padding:0; list-style:none; display:grid; gap:8px}
+.col li{padding-left:16px; position:relative; font-size:.95rem}
+.col li::before{content:""; position:absolute; left:0; top:.6em; width:7px; height:7px; border-radius:50%; background:var(--line)}
+.col.confirmed li::before{background:var(--snow)}
+.col.assumed li::before{background:var(--gate)}
+
+.qs{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin-top:20px}
+.qs div{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; min-width:0}
+.qs .n{font-stretch:72%; font-weight:800; font-size:2.3rem; line-height:1; color:var(--gate)}
+.qs h3{margin:8px 0 6px; font-size:1.05rem}
+.qs p{color:var(--muted); font-size:.93rem; margin:0}
+footer{color:var(--muted); font-size:.88rem; margin-top:48px}
+@media (max-width:640px){ .hero{padding-top:34px} .fig{padding:12px} }
+@media (prefers-reduced-motion: reduce){ .switch .route{animation:none !important} .lever,.route{transition:none} }
+.tbl{overflow-x:auto; margin-top:20px; background:var(--panel); border:1px solid var(--line); border-radius:12px}
+table{border-collapse:collapse; width:100%; min-width:760px; font-size:.92rem}
+th,td{text-align:left; vertical-align:top; padding:11px 14px; border-bottom:1px solid var(--line)}
+thead th{font-size:.76rem; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700}
+tbody th{font-weight:650} tbody th a{color:var(--ink)}
+tbody tr:last-child th,tbody tr:last-child td{border-bottom:0}
+tr.warn{background:var(--bad-soft)}
+.chip{display:inline-block; font-size:.78rem; font-weight:700; padding:2px 9px; border-radius:999px; margin:0 4px 4px 0; white-space:nowrap; text-decoration:none}
+.chip.keep{background:color-mix(in srgb, var(--ok) 16%, transparent); color:var(--ok)}
+.chip.new{background:var(--snow-soft); color:var(--snow)}
+.chip.risk{background:var(--gate-soft); color:var(--gate)}
+.chip.bad{background:var(--bad-soft); color:var(--bad)}
+.scroll{overflow-x:auto} .scroll svg{min-width:860px}
+.dg .box.t1{stroke:var(--ink); stroke-width:2}
+.dg.tl .band{fill:var(--gate-soft); stroke:var(--gate); stroke-width:1.5}
+.dg.tl .band-unk{fill:var(--tile); stroke:var(--line); stroke-dasharray:6 5}
+.dg.tl .band-lab{fill:var(--gate)}
+.dg.tl .bar-l{fill:var(--legacy-soft); stroke:var(--legacy); stroke-width:1.5}
+.dg.tl .bar-lb{fill:none; stroke:var(--legacy); stroke-width:1.5; stroke-dasharray:6 4}
+.dg.tl .bar-n{fill:var(--snow-soft); stroke:var(--snow); stroke-width:1.5}
+.dg.tl .bar-unk{fill:none; stroke:var(--line); stroke-width:1.5; stroke-dasharray:4 4}
+.dg.tl .bar-txt{fill:var(--ink); paint-order:stroke; stroke:var(--panel); stroke-width:5px; stroke-linejoin:round}
+.dg.tl .band-lab{paint-order:stroke; stroke:var(--panel); stroke-width:5px; stroke-linejoin:round}
+.dg.tl .xmark{stroke:var(--bad); stroke-width:3; fill:none}
+.dg.tl .mk{stroke:var(--ink); stroke-width:2; stroke-dasharray:5 4}
+.dg.tl .mk-decom{stroke:var(--legacy)} .dg.tl .mk-bad{stroke:var(--bad); stroke-width:3; stroke-dasharray:none} .dg.tl .mk-unk{stroke:var(--muted)}
+.dg.tl .mk-t{fill:var(--ink); font-weight:600} .dg.tl .mk-t-decom{fill:var(--legacy)} .dg.tl .mk-t-bad{fill:var(--bad)} .dg.tl .mk-t-unk{fill:var(--muted)}
+.dg.tl .st{stroke-width:2}
+.dg.tl .st-new{fill:var(--snow); stroke:var(--snow)} .dg.tl .st-legacy{fill:var(--legacy); stroke:var(--legacy)}
+.dg.tl .st-gate{fill:var(--gate); stroke:var(--gate)} .dg.tl .st-par{fill:var(--gate); stroke:var(--gate)}
+.dg.tl .st-bad{fill:var(--bad); stroke:var(--bad)} .dg.tl .st-unk{fill:var(--muted); stroke:var(--muted)}
+.dg.tl .st-n{fill:var(--on-accent); font-size:13px}
+.stepcards{list-style:none; margin:16px 0 0; padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px}
+.stepcards li{display:grid; grid-template-columns:30px 1fr; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; min-width:0}
+.stepcards .sn{display:grid; place-items:center; width:26px; height:26px; border-radius:50%; color:var(--on-accent); font-weight:800; font-size:.85rem}
+.stepcards strong{display:block; font-size:.98rem} .stepcards span{color:var(--muted); font-size:.9rem}
+.k-new .sn{background:var(--snow)} .k-legacy .sn{background:var(--legacy)} .k-gate .sn,.k-par .sn{background:var(--gate)} .k-bad .sn{background:var(--bad)} .k-unk .sn{background:var(--muted)}
+.tl-legend{display:flex; flex-wrap:wrap; gap:6px 16px; list-style:none; padding:0; margin:12px 0 0; color:var(--muted); font-size:.85rem}
+.tl-legend li{display:flex; align-items:center; gap:6px}
+.tl-legend i{display:inline-block; width:12px; height:12px; border-radius:50%}
+.tabs{display:flex; flex-wrap:wrap; gap:6px 6px; align-items:center; margin:18px 0 18px}
+.tabgroup{font-family:var(--mono); font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 4px 0 10px}
+.tabgroup:first-child{margin-left:0}
+.tabs button{font:inherit; font-size:.9rem; font-weight:600; border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:999px; padding:7px 14px; cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+.tabs button:focus-visible{outline:2px solid var(--snow); outline-offset:2px}
+.case-head{display:flex; flex-wrap:wrap; gap:12px 24px; justify-content:space-between; align-items:flex-end}
+.case-head h3{font-stretch:78%; font-weight:800; font-size:clamp(1.6rem,3.6vw,2.3rem); margin:0; line-height:1.05}
+.case-head .eyebrow{margin-bottom:6px}
+.route{margin:6px 0 0; font-size:1rem} .route .from{color:var(--legacy); font-weight:650} .route .to{color:var(--snow); font-weight:650}
+.ev{display:flex; flex-direction:column; align-items:flex-end; gap:2px} .evn{font-size:.82rem; color:var(--muted)}
+.sum{max-width:80ch; margin:16px 0 0; font-size:1.02rem}
+.borrow{margin-top:16px; background:var(--snow-soft); border:1px solid var(--snow); border-radius:12px; padding:14px 18px; display:grid; gap:4px; max-width:84ch}
+.borrow strong{color:var(--snow)}
+.cnotes{color:var(--muted); font-size:.9rem; margin:12px 0 0; padding-left:20px; max-width:84ch}
+.csrc{font-size:.88rem; color:var(--muted); margin-top:10px} .csrc a{color:var(--ink)}
+@media (max-width:640px){ .ev{align-items:flex-start} }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-ink" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-gate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<script>
+/* Shared timeline renderer: legacy and new lanes, parallel band, numbered steps, markers. Positions are 0..100 (schematic). */
+function tlX(p){ return 160 + p * 9; }
+function tlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function renderTimeline(c){
+  var o = [];
+  o.push('<svg class="dg tl" viewBox="0 0 1100 280" role="img" aria-label="' + tlEsc(c.aria || ('Timeline of how ' + c.name + ' went live')) + '">');
+  // parallel band
+  if (c.parallel){
+    var p = c.parallel, x1 = tlX(p.from), x2 = tlX(p.to);
+    o.push('<rect x="'+x1+'" y="62" width="'+(x2-x1)+'" height="136" rx="6" class="band'+(p.unknown?' band-unk':'')+'"/>');
+    o.push('<text class="lab c band-lab" x="'+((x1+x2)/2)+'" y="54">'+tlEsc(p.label)+'</text>');
+  }
+  // lane labels
+  o.push('<text class="lab" x="10" y="100" style="fill:var(--legacy)">Legacy</text>');
+  o.push('<text class="lab" x="10" y="170" style="fill:var(--snow)">New platform</text>');
+  // legacy bar
+  var L = c.legacy, lEnd = L.backupFrom != null ? L.backupFrom : L.end;
+  o.push('<rect x="'+tlX(L.start)+'" y="80" width="'+(tlX(lEnd)-tlX(L.start))+'" height="30" rx="4" class="bar-l"/>');
+  o.push('<text class="s bar-txt" x="'+(tlX(L.start)+10)+'" y="100">'+tlEsc(L.label)+'</text>');
+  if (L.backupFrom != null){
+    o.push('<rect x="'+tlX(L.backupFrom)+'" y="80" width="'+(tlX(L.end)-tlX(L.backupFrom))+'" height="30" rx="4" class="bar-lb"/>');
+    o.push('<text class="s" x="'+(tlX(L.backupFrom)+8)+'" y="100" style="fill:var(--legacy)">'+tlEsc(L.backupLabel || 'backup')+'</text>');
+  }
+  if (L.endUnknown){
+    o.push('<rect x="'+tlX(L.end)+'" y="80" width="'+(tlX(100)-tlX(L.end))+'" height="30" rx="4" class="bar-unk"/>');
+    o.push('<text class="s c" x="'+((tlX(L.end)+tlX(100))/2)+'" y="100">end not published</text>');
+  } else if (L.end < 100 && !L.noX){
+    var xe = tlX(L.end);
+    o.push('<path d="M'+(xe-7)+',88 l14,14 M'+(xe+7)+',88 l-14,14" class="xmark"/>');
+  }
+  // new bar
+  var N = c.neu;
+  o.push('<rect x="'+tlX(N.start)+'" y="150" width="'+(tlX(N.end)-tlX(N.start))+'" height="30" rx="4" class="bar-n"/>');
+  o.push('<text class="s bar-txt" x="'+(tlX(N.start)+10)+'" y="170">'+tlEsc(N.label)+'</text>');
+  // markers
+  (c.marks || []).forEach(function(m, i){
+    var x = tlX(m.at), y = (i % 2 === 0) ? 236 : 260;
+    o.push('<line x1="'+x+'" y1="62" x2="'+x+'" y2="'+(y-14)+'" class="mk mk-'+m.kind+'"/>');
+    var anchor = m.at > 80 ? 'e' : (m.at < 12 ? '' : 'c');
+    o.push('<text class="s '+anchor+' mk-t mk-t-'+m.kind+'" x="'+x+'" y="'+y+'">'+tlEsc(m.label)+'</text>');
+  });
+  // step markers
+  (c.steps || []).forEach(function(s, i){
+    var x = tlX(s.at);
+    o.push('<circle cx="'+x+'" cy="130" r="12" class="st st-'+s.k+'"/>');
+    o.push('<text class="t sm c st-n" x="'+x+'" y="135">'+(i+1)+'</text>');
+  });
+  o.push('</svg>');
+  return o.join('');
+}
+function renderSteps(c){
+  return '<ol class="stepcards">' + c.steps.map(function(s, i){
+    return '<li class="k-'+s.k+'"><span class="sn">'+(i+1)+'</span><div><strong>'+tlEsc(s.t)+'</strong><span>'+tlEsc(s.d)+'</span></div></li>';
+  }).join('') + '</ol>';
+}
+var CASES = [
+{ id:'santander', name:'Banco Santander', group:'Bank', from:'Mainframe', to:'Google Cloud (Gravity)', evidence:'Detailed', evNote:'Google white paper and Santander press releases',
+  summary:'Both systems ran on the same inputs with the mainframe in charge. Every batch output was compared. When outcomes matched, the cloud became primary and the mainframe carried on as a backup.',
+  legacy:{start:0,end:92,label:'Mainframe, primary',backupFrom:62,backupLabel:'secondary, kept as backup'},
+  neu:{start:16,end:100,label:'Google Cloud, secondary, then primary'},
+  parallel:{from:22,to:62,label:'Dual run · typically 6 to 12 months'},
+  marks:[{at:62,label:'Certify and switch: cloud becomes primary',kind:'cut'},{at:92,label:'Mainframe switched off when the bank chooses',kind:'decom'}],
+  steps:[
+    {at:16,t:'Build on the cloud',d:'Workloads rebuilt on Gravity, the bank\'s own cloud-native platform.',k:'new'},
+    {at:30,t:'Dual run, legacy primary',d:'The same inputs go to both. The mainframe stays primary and the cloud is secondary.',k:'par'},
+    {at:44,t:'Compare outcomes',d:'Batch output files are compared and shown on dashboards. A synchroniser keeps databases and files aligned.',k:'gate'},
+    {at:62,t:'Certify and switch',d:'Once outcome validation passes, the primary switches to Google Cloud.',k:'new'},
+    {at:76,t:'Legacy as backup',d:'The mainframe stays on as the secondary system, ready to take over.',k:'legacy'},
+    {at:90,t:'Switch off',d:'The bank decides when to switch off traffic to the mainframe completely.',k:'legacy'}],
+  borrow:'This is our blue/green go-live. Snowflake-fed tables become primary while SSIS keeps loading the legacy tables as the backup.',
+  notes:['Santander says its UK commercial and Chile consumer migrations finished "without any service interruption".','The 6 to 12 months is Google\'s typical figure for the dual-run phase, not a figure Santander published.'],
+  sources:[['Dual Run white paper','https://services.google.com/fh/files/misc/google-cloud-dual-run-white-paper-mainframe-mod.pdf'],['Dual Run overview','https://docs.cloud.google.com/mainframe-dual-run/docs/dual-run-overview'],['Santander CIB press release','https://www.santander.com/en/press-room/press-releases/2023/12/santander-passes-key-milestone-in-its-transformation-after-migrating-its-cib-banking-platform-to-the-cloud']]},
+
+{ id:'ukbank', name:'Major UK bank', group:'Bank', from:'Teradata, Hadoop, SAS', to:'Snowflake on AWS', evidence:'Partial', evNote:'Version 1 case study',
+  summary:'They built a proof of concept, then developed in increments with sign-off at each step. Old and new ran side by side for at least six months, then the legacy platforms were decommissioned.',
+  legacy:{start:0,end:86,label:'Teradata, Hadoop, SAS'},
+  neu:{start:12,end:100,label:'Snowflake on AWS (Perimeter Reporting Framework)'},
+  parallel:{from:30,to:80,label:'Parallel run · at least 6 months'},
+  marks:[{at:80,label:'Full migration (method not published)',kind:'unk'},{at:86,label:'SAS, Teradata, Hadoop decommissioned',kind:'decom'}],
+  steps:[
+    {at:12,t:'Proof of concept',d:'An initial POC on Snowflake.',k:'new'},
+    {at:22,t:'Incremental build',d:'Client needs signed off before extensive downstream development. Covers 17 source systems and 100+ ETL scripts.',k:'new'},
+    {at:50,t:'Parallel run',d:'At least 6 months comparing old and new results to find bugs and improvements.',k:'par'},
+    {at:80,t:'Full migration',d:'Moved to the new process. The cutover method isn\'t published.',k:'unk'},
+    {at:88,t:'Decommission',d:'Legacy SAS, Teradata and Cloudera Hadoop switched off. The new process kept working.',k:'legacy'}],
+  borrow:'Six months of side-by-side running was the minimum for this bank. Our parallel run should be sized by business cycles, not by weeks.',
+  notes:['The case study doesn\'t say how results were reconciled or what tolerances were used.'],
+  sources:[['Version 1 case study','https://www.version1.com/customer-success/snowflake-migration-uk-bank/']]},
+
+{ id:'cba', name:'Commonwealth Bank', group:'Bank', from:'On-prem platform, 61,000 pipelines, 10 PB', to:'CommBank.data on AWS', evidence:'Partial', evNote:'re:Invent 2025 talk summary, trade press',
+  summary:'They proved the hardest pipelines end to end with "steel threads", converted the rest at scale with AI tooling, and tested every pipeline three times against the on-prem platform, aiming for 100% reconciliation. It took nine months.',
+  legacy:{start:0,end:86,label:'On-prem platform',endUnknown:true},
+  neu:{start:8,end:100,label:'CommBank.data on AWS'},
+  parallel:{from:24,to:86,label:'Parallel testing · details not published',unknown:true},
+  marks:[{at:8,label:'Start, July 2024',kind:'cut'},{at:92,label:'Concluded in about 9 months',kind:'decom'}],
+  steps:[
+    {at:8,t:'Steel threads',d:'Workshops on the hardest pipelines and AI use cases, taken all the way to production. Not a proof of concept.',k:'new'},
+    {at:26,t:'Convert at scale',d:'AI and generative AI converted code and checked errors. Delivery pods tracked metrics every sprint.',k:'new'},
+    {at:48,t:'Test every pipeline 3 times',d:'229,000 tests in total.',k:'gate'},
+    {at:68,t:'Reconcile against on-prem',d:'Aimed at 100% accuracy for every row, column and number.',k:'gate'},
+    {at:92,t:'Complete',d:'The migration concluded. Cutover steps aren\'t published.',k:'unk'}],
+  borrow:'A steel thread: prove the hardest real slice in production before scaling. Make the reconciliation exhaustive and automated.',
+  notes:['The details come from a summary of the re:Invent talk. Check figures against the video before quoting them.'],
+  sources:[['re:Invent 2025 summary','https://zenn.dev/kiiwami/articles/6e94e2fe0d8b8a1d?locale=en'],['ZenML case write-up','https://www.zenml.io/llmops-database/large-scale-enterprise-data-platform-migration-using-ai-and-generative-ai-automation'],['Retail Banker International','https://www.retailbankerinternational.com/news/commbank-concludes-aws-migration/']]},
+
+{ id:'nab', name:'NAB', group:'Bank', from:'Teradata (26 years old)', to:'Ada: Databricks on AWS', evidence:'Partial', evNote:'iTnews and Databricks',
+  summary:'They mapped 956 use cases, then cut them to about 400 using usage logs and user sign-off. Critical Exadata tables were copied over as a temporary bridge, and a cold backup was taken. Teradata was switched off, followed by two to three months of fixes.',
+  legacy:{start:0,end:78,label:'Teradata, 5 cabinets'},
+  neu:{start:10,end:100,label:'Ada: Databricks on AWS'},
+  parallel:{from:20,to:78,label:'Side by side · details not published',unknown:true},
+  marks:[{at:78,label:'Teradata switched off, live-streamed internally',kind:'decom'}],
+  steps:[
+    {at:5,t:'Map use cases',d:'956 use cases across reports, models and extracts, with circular data flows found.',k:'legacy'},
+    {at:15,t:'Cut scope',d:'Down to "just over 400", checked against system logs, hit rates and recent use.',k:'gate'},
+    {at:30,t:'Users test and sign off',d:'A user willing to sign off was treated as the sign that a use case mattered.',k:'gate'},
+    {at:45,t:'Bridge tables',d:'Copies of critical Exadata tables made in Databricks as a temporary source.',k:'new'},
+    {at:62,t:'Cold backup',d:'Data, schemas, models and SQL kept in cold storage.',k:'legacy'},
+    {at:78,t:'Switch off',d:'Teradata decommissioned. Payments and lending logic found inside it was moved back to core systems.',k:'legacy'},
+    {at:90,t:'Fix forward',d:'About 95% ported cleanly. Two to three months of refactoring on the hard 5%.',k:'new'}],
+  borrow:'Cut scope before migrating, check which tier-1 tables tier-2 actually reads, and keep a cold backup after switch-off.',
+  notes:['NAB used "heritage" rather than "legacy" to respect what the old platform had delivered.'],
+  sources:[['iTnews: how NAB unwound Teradata','https://www.itnews.com.au/news/how-nab-unwound-teradatas-tentacles-to-decommission-it-617911'],['iTnews: NAB decommissions Teradata','https://www.itnews.com.au/news/nab-decommissions-26-year-old-teradata-platform-603456'],['Databricks: NAB','https://www.databricks.com/customers/nab/dbsql']]},
+
+{ id:'capone', name:'Capital One', group:'Bank', from:'Teradata EDW, 18,000 tables', to:'Snowflake', evidence:'Partial', evNote:'HBR sponsored article, SiliconANGLE',
+  summary:'They started with limited use cases and expanded slowly, moving only about 6,000 of 18,000 tables. Both warehouses ran in parallel for a while, and Snowflake replaced the EDW after more than a year.',
+  legacy:{start:0,end:85,label:'Teradata EDW'},
+  neu:{start:10,end:100,label:'Snowflake'},
+  parallel:{from:25,to:85,label:'Both warehouses in parallel "for a while"'},
+  marks:[{at:85,label:'Legacy EDW replaced, after more than a year',kind:'decom'}],
+  steps:[
+    {at:10,t:'Limited use cases',d:'Started small.',k:'new'},
+    {at:30,t:'Expand slowly',d:'Grew use case by use case.',k:'new'},
+    {at:50,t:'Cut scope',d:'About 6,000 of 18,000 tables migrated.',k:'gate'},
+    {at:68,t:'Parallel running',d:'Both warehouses ran in parallel for a while.',k:'par'},
+    {at:85,t:'Replace the EDW',d:'Legacy retired. Cutover steps aren\'t published.',k:'legacy'}],
+  borrow:'Grow slice by slice, and only migrate what’s used.',
+  notes:['Capital One says it was the first US bank to move fully to the public cloud, in 2020.'],
+  sources:[['HBR (Snowflake sponsored)','https://hbr.org/sponsored/2021/02/how-capital-one-moved-its-data-analytics-to-the-cloud'],['SiliconANGLE','https://siliconangle.com/2022/07/09/capital-one-sees-win-win-selling-software-built-snowflake-cloud/']]},
+
+{ id:'fr2052a', name:'Large US bank, FR 2052a', group:'Bank', from:'Proteus', to:'Axiom', evidence:'Thin', evNote:'Crisil case study',
+  summary:'For a liquidity report, they mapped sources and lineage, built in Axiom, and ran parallel reporting reconciled against the legacy output before UAT, go-live and stabilisation.',
+  legacy:{start:0,end:82,label:'Proteus (legacy FR 2052a)',endUnknown:true},
+  neu:{start:15,end:100,label:'Axiom'},
+  parallel:{from:45,to:75,label:'Parallel reporting · duration not published'},
+  marks:[{at:75,label:'Go-live (method not published)',kind:'cut'}],
+  steps:[
+    {at:8,t:'Source and lineage mapping',d:'Data elements mapped and sourcing validated.',k:'legacy'},
+    {at:20,t:'Gap assessment',d:'Against the target state in Axiom.',k:'gate'},
+    {at:32,t:'Build in Axiom',d:'Regulatory instructions turned into Axiom logic. Manual adjustments and spreadsheet tools automated.',k:'new'},
+    {at:55,t:'Parallel reporting',d:'Reconciled against legacy output "to build confidence".',k:'par'},
+    {at:66,t:'UAT',d:'Business acceptance.',k:'gate'},
+    {at:75,t:'Go-live',d:'Submissions stayed on time.',k:'new'},
+    {at:88,t:'Stabilise',d:'Post-implementation support.',k:'new'}],
+  borrow:'This is the closest report family to ours. Reconcile the reports in parallel before go-live, not just the data.',
+  notes:['Reconciliation levels, tolerances and duration aren\'t published.'],
+  sources:[['Crisil Integral IQ case study','https://integraliq.crisil.com/en/homepage/what-we-think/all-our-thinking/case-studies/2026/04/fr-2052a-regulatory-reporting-platform-migration.html']]},
+
+{ id:'tsb', name:'TSB (what not to do)', group:'Bank', from:'Legacy banking platform', to:'New banking platform', evidence:'Detailed', evNote:'Independent review by Slaughter and May, via ITPro',
+  summary:'Everything was switched in one big bang, with no side-by-side running. The review found the approach "played a key part in the IT failure", alternatives were never weighed, and testing was not robust.',
+  legacy:{start:0,end:50,label:'Legacy platform'},
+  neu:{start:50,end:100,label:'New platform, live in one step'},
+  parallel:null,
+  marks:[{at:50,label:'Big bang: everything at once, 2018',kind:'bad'}],
+  steps:[
+    {at:15,t:'Big bang chosen',d:'The review says alternatives were not weighed, and the board "did not substantively discuss the choice made".',k:'bad'},
+    {at:32,t:'Testing',d:'The review found "a lack of robust testing" of the new system.',k:'bad'},
+    {at:50,t:'Single cutover',d:'No parallel running and no way back.',k:'bad'},
+    {at:70,t:'Failure',d:'A major customer-facing IT failure followed.',k:'bad'}],
+  borrow:'Weigh the alternatives explicitly, get the board or SteerCo to discuss the choice and minute it, and test properly. This is why we’re presenting options.',
+  notes:[],
+  sources:[['ITPro on the review','https://itpro.com/business-strategy/digital-transformation/354155/tsbs-it-disaster-pinned-on-big-bang-approach-to']]},
+
+{ id:'wealth', name:'Wealth managers (guide)', group:'Financial', from:'On-prem systems', to:'Snowflake', evidence:'Detailed', evNote:'Milemarker guidance, not a single named firm',
+  summary:'Shadow reconciliation first, then shadow billing until two consecutive cycles came in under 0.01% variance. Cutover was at the start of a quarter in a weekend window, and the legacy system was retired in stages.',
+  legacy:{start:0,end:94,label:'Legacy, system of record',backupFrom:70,backupLabel:'read-only for retention'},
+  neu:{start:10,end:100,label:'Snowflake'},
+  parallel:{from:20,to:70,label:'Parallel run · 30 to 90 days, 60 typical'},
+  marks:[{at:70,label:'Start of a quarter, 4 to 8 hour weekend window',kind:'cut'},{at:94,label:'Retired in stages',kind:'decom'}],
+  steps:[
+    {at:22,t:'Shadow reconciliation',d:'Daily at position, account and billing level. Two to four weeks clean.',k:'par'},
+    {at:45,t:'Shadow billing',d:'Exit gate: two consecutive billing cycles under 0.01% total fee variance.',k:'gate'},
+    {at:70,t:'Cutover',d:'Start of a new quarter, in a weekend or after-hours window.',k:'new'},
+    {at:82,t:'Staged retirement',d:'Billing engine first, then compliance data, then the operational archive.',k:'legacy'},
+    {at:94,t:'Read-only legacy',d:'Kept accessible for the retention period.',k:'legacy'}],
+  borrow:'Numeric exit criteria tied to business cycles, and a cutover timed to a period boundary.',
+  notes:['This is guidance written for the sector, not one firm\'s story.'],
+  sources:[['Milemarker guide','https://www.milemarker.co/resources/guides/snowflake-migration-wealth-management']]},
+
+{ id:'insurer', name:'Insurer', group:'Financial', from:'SQL Server', to:'Snowflake + dbt', evidence:'Partial', evNote:'Infinite Lambda case study',
+  summary:'They mapped model dependencies, sequenced by source priority, and migrated model by model. SQL Server and dbt outputs were compared automatically every day.',
+  legacy:{start:0,end:84,label:'SQL Server, in use throughout',endUnknown:true},
+  neu:{start:10,end:100,label:'Snowflake + dbt'},
+  parallel:{from:22,to:84,label:'Daily comparisons, model by model'},
+  marks:[],
+  steps:[
+    {at:8,t:'Map dependencies',d:'Between models across 9 source systems.',k:'legacy'},
+    {at:20,t:'Sequence a roadmap',d:'Using the client\'s source priority order.',k:'gate'},
+    {at:36,t:'Migrate model by model',d:'Rebuilt rather than lifted and shifted, because some procs changed data.',k:'new'},
+    {at:56,t:'Compare daily',d:'Custom dbt macros compared SQL Server and dbt outputs and stored the results in Snowflake.',k:'gate'},
+    {at:74,t:'Fix fast',d:'Time to fix an issue went from two days to a couple of hours.',k:'new'}],
+  borrow:'Automate the daily comparison and store the results, so breaks are found the next morning.',
+  notes:['Cutover and decommissioning aren\'t published.'],
+  sources:[['Infinite Lambda case study','https://infinitelambda.com/case-studies/cloud-data-migration-insurance/']]},
+
+{ id:'healthy', name:'Healthy Directions', group:'Other', from:'SQL Server + SSIS', to:'Snowflake', evidence:'Thin', evNote:'Datafold case study',
+  summary:'They rebuilt the stored procedures and SSIS logic in Snowflake and validated with value-level diffs across hundreds of objects. They went live on schedule with no unplanned downtime.',
+  legacy:{start:0,end:80,label:'SQL Server + SSIS'},
+  neu:{start:10,end:100,label:'Snowflake'},
+  parallel:{from:30,to:80,label:'Validation period · length not published',unknown:true},
+  marks:[{at:80,label:'On schedule, 0 unplanned downtime',kind:'cut'}],
+  steps:[
+    {at:10,t:'Rebuild logic',d:'Stored procedures and SSIS packages replicated and tuned for Snowflake.',k:'new'},
+    {at:36,t:'Value-level diffs',d:'Hundreds of objects compared value by value. Estimated to save 4 to 5 weeks of manual checks.',k:'gate'},
+    {at:58,t:'Monitor',d:'Ongoing integrity checks during the migration.',k:'gate'},
+    {at:80,t:'Go-live',d:'"The business could rely on the new system from day one."',k:'new'}],
+  borrow:'The same source stack as ours. Value-level diffs between SQL Server and Snowflake are proven tooling.',
+  notes:[],
+  sources:[['Datafold case study','https://www.datafold.com/case-study/healthy-directions-sql-server-to-snowflake-migration']]},
+
+{ id:'wttj', name:'Welcome to the Jungle', group:'Other', from:'PostgreSQL', to:'Snowflake', evidence:'Detailed', evNote:'Engineering blog',
+  summary:'A full double run. Dashboards moved product by product, and outbound feeds moved last with row-by-row checks. The old warehouse was switched off after a week with zero alerts, then snapshotted and deleted.',
+  legacy:{start:0,end:90,label:'PostgreSQL warehouse'},
+  neu:{start:8,end:100,label:'Snowflake'},
+  parallel:{from:18,to:80,label:'Full double run'},
+  marks:[{at:80,label:'Switch-off',kind:'cut'},{at:90,label:'Snapshot, then delete',kind:'decom'}],
+  steps:[
+    {at:8,t:'Set up',d:'Snowflake environment.',k:'new'},
+    {at:18,t:'Move ingestion',d:'Old pipelines kept running. Each one frozen until its Snowflake twin was ready.',k:'new'},
+    {at:28,t:'Rebuild models',d:'In dbt, on the old warehouse first.',k:'new'},
+    {at:40,t:'QA DAGs',d:'Row counts, column lists and min/max dates checked daily, with alerts on any divergence.',k:'gate'},
+    {at:54,t:'Dashboards by product',d:'Moved one product at a time to surface bugs gradually.',k:'new'},
+    {at:67,t:'Outbound feeds last',d:'Stricter double run, checked row by row.',k:'gate'},
+    {at:80,t:'Switch off',d:'After a couple of checks and a week with zero alerts.',k:'legacy'},
+    {at:90,t:'Delete',d:'Final snapshots, then the old warehouse erased.',k:'legacy'}],
+  borrow:'Feeds that leave the platform get the strictest checks and move last. For us, that’s the data tier-2 reads.',
+  notes:[],
+  sources:[['Engineering blog','https://medium.com/wttj-tech/from-postgresql-to-snowflake-a-data-migration-story-5fd17f778019']]}
+];
+</script>
+<main>
+<header class="hero">
+  <p class="eyebrow">LIQ migration · case playbooks</p>
+  <h1>How eleven migrations went live</h1>
+  <p class="lede">Each case is drawn on the same timeline: legacy on top, the new platform below, the side-by-side period shaded, and numbered steps in the order they happened. Anything a source doesn't publish is drawn dashed and labelled. Timelines are schematic, not to scale.</p>
+</header>
+
+<section aria-labelledby="h-glance">
+  <h2 id="h-glance">At a glance</h2>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Case</th><th>How it switched</th><th>Side by side</th><th>Way back after go-live</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><th><a href="#santander" data-go="santander">Banco Santander</a></th><td>Swapped primary and secondary</td><td><span class="chip new">6–12 months</span></td><td><span class="chip keep">Legacy kept as backup</span></td><td>Detailed</td></tr>
+        <tr><th><a href="#ukbank" data-go="ukbank">Major UK bank</a></th><td>Incremental, then full migration</td><td><span class="chip new">at least 6 months</span></td><td>Not published</td><td>Partial</td></tr>
+        <tr><th><a href="#cba" data-go="cba">Commonwealth Bank</a></th><td>Steel threads, then scale</td><td>Parallel testing</td><td>Not published</td><td>Partial</td></tr>
+        <tr><th><a href="#nab" data-go="nab">NAB</a></th><td>Cut scope, then use case by use case</td><td>Not published</td><td><span class="chip keep">Cold backup</span></td><td>Partial</td></tr>
+        <tr><th><a href="#capone" data-go="capone">Capital One</a></th><td>Use case by use case</td><td>"For a while"</td><td>Not published</td><td>Partial</td></tr>
+        <tr><th><a href="#fr2052a" data-go="fr2052a">US bank, FR 2052a</a></th><td>Parallel reporting, then go-live</td><td>Not published</td><td>Not published</td><td>Thin</td></tr>
+        <tr class="warn"><th><a href="#tsb" data-go="tsb">TSB</a></th><td>Big bang</td><td><span class="chip bad">none</span></td><td><span class="chip bad">none</span></td><td>Detailed</td></tr>
+        <tr><th><a href="#wealth" data-go="wealth">Wealth managers</a></th><td>Quarter-start cutover, staged retirement</td><td><span class="chip new">30–90 days</span></td><td><span class="chip keep">Legacy read-only</span></td><td>Guidance</td></tr>
+        <tr><th><a href="#insurer" data-go="insurer">Insurer</a></th><td>Model by model</td><td>Daily comparisons</td><td>Not published</td><td>Partial</td></tr>
+        <tr><th><a href="#healthy" data-go="healthy">Healthy Directions</a></th><td>Not published</td><td>Validation period</td><td>Not published</td><td>Thin</td></tr>
+        <tr><th><a href="#wttj" data-go="wttj">Welcome to the Jungle</a></th><td>Product by product, outbound feeds last</td><td><span class="chip new">full double run</span></td><td><span class="chip keep">1 week before delete</span></td><td>Detailed</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="h-case">
+  <h2 id="h-case">Case by case</h2>
+  <div class="tabs" role="tablist" aria-label="Choose a case" id="tabs"></div>
+  <div class="case" id="case" role="tabpanel" aria-live="polite"></div>
+</section>
+
+<footer>Case playbooks compiled 17 October 2026 for the LIQ migration. See also the research summary and the recommended LIQ go-live.</footer>
+</main>
+<script>
+(function(){
+  var tabs = document.getElementById('tabs'), panel = document.getElementById('case');
+  var groups = {Bank:'Banks', Financial:'Financial services', Other:'Other'};
+  function badge(e){ var cls = e==='Detailed'?'keep':(e==='Thin'?'bad':'risk'); return '<span class="chip '+cls+'">'+e+' evidence</span>'; }
+  function show(id){
+    var c = CASES.filter(function(x){return x.id===id;})[0] || CASES[0];
+    Array.prototype.forEach.call(tabs.querySelectorAll('button'), function(b){ b.setAttribute('aria-selected', String(b.dataset.id===c.id)); });
+    var html = '';
+    html += '<div class="case-head"><div><p class="eyebrow">'+groups[c.group]+'</p><h3>'+tlEsc(c.name)+'</h3><p class="route"><span class="from">'+tlEsc(c.from)+'</span> → <span class="to">'+tlEsc(c.to)+'</span></p></div><div class="ev">'+badge(c.evidence)+'<span class="evn">'+tlEsc(c.evNote)+'</span></div></div>';
+    html += '<p class="sum"><strong>How they went live.</strong> '+tlEsc(c.summary)+'</p>';
+    html += '<figure><div class="fig"><div class="scroll">'+renderTimeline(c)+'</div>'+
+      '<ul class="tl-legend"><li><i style="background:var(--snow)"></i>new platform step</li><li><i style="background:var(--legacy)"></i>legacy step</li><li><i style="background:var(--gate)"></i>check or parallel</li><li><i style="background:var(--muted)"></i>not published</li><li><i style="background:var(--bad)"></i>failure point</li></ul></div></figure>';
+    html += renderSteps(c);
+    html += '<div class="borrow"><strong>What to borrow for LIQ</strong><span>'+tlEsc(c.borrow)+'</span></div>';
+    if (c.notes.length) html += '<ul class="cnotes">'+c.notes.map(function(n){return '<li>'+tlEsc(n)+'</li>';}).join('')+'</ul>';
+    html += '<p class="csrc">Sources: '+c.sources.map(function(s){return '<a href="'+s[1]+'">'+tlEsc(s[0])+'</a>';}).join(' · ')+'</p>';
+    panel.innerHTML = html;
+  }
+  var lastGroup = '';
+  CASES.forEach(function(c){
+    if (c.group !== lastGroup){ var g = document.createElement('span'); g.className='tabgroup'; g.textContent = groups[c.group]; tabs.appendChild(g); lastGroup = c.group; }
+    var b = document.createElement('button'); b.type='button'; b.role='tab'; b.dataset.id=c.id; b.textContent=c.name;
+    b.addEventListener('click', function(){ show(c.id); });
+    tabs.appendChild(b);
+  });
+  document.querySelectorAll('[data-go]').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); show(a.dataset.go); document.getElementById('h-case').scrollIntoView({behavior:'smooth'}); }); });
+  var h = (location.hash||'').replace('#','');
+  show(h || 'santander');
+})();
+</script>
+
+</html>

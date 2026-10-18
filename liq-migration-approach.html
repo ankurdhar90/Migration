@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LIQ Migration Approach</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: one column of wide diagram panels, read top to bottom; matches the cutover page's visual vocabulary */
+:root{
+  --paper:#EEF1F4; --panel:#FFFFFF; --tile:#F5F7F9; --ink:#18222F; --muted:#586577; --line:#C3CCD6;
+  --legacy:#7B4FA3; --legacy-soft:#ECE3F5; --snow:#0B7A84; --snow-soft:#DDF1F2;
+  --gate:#A86300; --gate-soft:#FCEFD9; --bad:#B42318; --bad-soft:#FBE4E1; --ok:#2F7D32; --on-accent:#FFFFFF;
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#121920; --panel:#18212B; --tile:#1F2A36; --ink:#E4E9EE; --muted:#9AA6B3; --line:#34414F;
+    --legacy:#B58EDB; --legacy-soft:#2E2540; --snow:#4CC3CC; --snow-soft:#173539;
+    --gate:#E8A23D; --gate-soft:#3A2C14; --bad:#F2796B; --bad-soft:#3D1F1C; --ok:#79C47D; --on-accent:#121920;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121920; --panel:#18212B; --tile:#1F2A36; --ink:#E4E9EE; --muted:#9AA6B3; --line:#34414F;
+  --legacy:#B58EDB; --legacy-soft:#2E2540; --snow:#4CC3CC; --snow-soft:#173539;
+  --gate:#E8A23D; --gate-soft:#3A2C14; --bad:#F2796B; --bad-soft:#3D1F1C; --ok:#79C47D; --on-accent:#121920;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--display); font-size:17px; line-height:1.55; -webkit-font-smoothing:antialiased}
+main{max-width:1180px; margin:0 auto; padding-block:0 72px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.hero{padding:52px 0 4px}
+.eyebrow{font-family:var(--mono); font-size:.8rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 10px}
+h1{font-stretch:72%; font-weight:800; font-size:clamp(2.4rem,6.5vw,4.4rem); line-height:.98; letter-spacing:-.01em; margin:0 0 16px; max-width:15ch; text-wrap:balance}
+.lede{max-width:64ch; color:var(--muted); font-size:1.1rem; margin:0}
+section{padding:48px 0 8px; border-top:1px solid var(--line); margin-top:40px}
+h2{font-stretch:82%; font-weight:750; font-size:clamp(1.5rem,3.3vw,2.15rem); line-height:1.08; margin:0 0 10px; text-wrap:balance}
+p{max-width:68ch; margin:0 0 12px}
+figure{margin:22px 0 6px}
+.fig{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; overflow-x:auto}
+.fig svg{display:block; width:100%; height:auto}
+figcaption{color:var(--muted); font-size:.93rem; margin-top:10px; max-width:74ch}
+
+.dg text{font-family:var(--display)}
+.dg .t{font-size:16px; font-weight:650; fill:var(--ink)}
+.dg .sm{font-size:14px}
+.dg .s{font-size:13px; fill:var(--muted)}
+.dg .lab{font-size:13px; font-weight:700; fill:var(--muted)}
+.dg .m{font-family:var(--mono); font-size:13px; fill:var(--ink)}
+.dg .c{text-anchor:middle}
+.dg .e{text-anchor:end}
+.dg .box{fill:var(--tile); stroke:var(--line); stroke-width:1.5}
+.dg .box.legacy{stroke:var(--legacy); stroke-width:2}
+.dg .box.snow{stroke:var(--snow); stroke-width:2}
+.dg .box.gate{stroke:var(--gate); stroke-width:2; fill:var(--gate-soft)}
+.dg .box.bad{stroke:var(--bad); stroke-width:2; fill:var(--bad-soft)}
+.dg .fill-legacy{fill:var(--legacy-soft); stroke:var(--legacy); stroke-width:1.5}
+.dg .fill-snow{fill:var(--snow-soft); stroke:var(--snow); stroke-width:1.5}
+.dg .fill-tile{fill:var(--tile); stroke:var(--line); stroke-width:1.5}
+.dg .zone{fill:none; stroke:var(--line); stroke-width:1.5; stroke-dasharray:6 6}
+.dg .zone.legacy{stroke:var(--legacy)} .dg .zone.snow{stroke:var(--snow)}
+.dg .wire{fill:none; stroke:var(--ink); stroke-width:1.75}
+.dg .wire.muted{stroke:var(--muted)}
+.dg .wire.gate{stroke:var(--gate); stroke-width:2}
+.dg .wire.bad{stroke:var(--bad)}
+.dg .dash{stroke-dasharray:5 5}
+.dg .f-legacy{fill:var(--legacy)} .dg .f-snow{fill:var(--snow)} .dg .f-gate{fill:var(--gate)} .dg .f-bad{fill:var(--bad)} .dg .f-on{fill:var(--on-accent)}
+.ah-ink{fill:var(--ink)} .ah-muted{fill:var(--muted)} .ah-gate{fill:var(--gate)}
+
+.switch-head{display:flex; flex-wrap:wrap; gap:14px 20px; align-items:center; justify-content:space-between; margin-bottom:12px}
+.toggle{display:inline-flex; flex-wrap:wrap; border:1px solid var(--line); border-radius:999px; padding:4px; background:var(--tile); gap:4px}
+.toggle button{font:inherit; font-weight:650; font-size:.95rem; border:0; background:transparent; color:var(--muted); padding:8px 16px; border-radius:999px; cursor:pointer}
+.toggle button[aria-pressed="true"][data-route="legacy"]{background:var(--legacy); color:var(--on-accent)}
+.toggle button[aria-pressed="true"][data-route="snow"]{background:var(--snow); color:var(--on-accent)}
+.toggle button:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+.state{font-weight:650; margin:0}
+.state .dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; vertical-align:middle}
+.route{fill:none; stroke-width:4.5; stroke-linecap:round; stroke-linejoin:round; transition:stroke .3s, opacity .3s}
+.route.legacy{stroke:var(--legacy)} .route.snow{stroke:var(--snow)}
+.switch[data-route="legacy"] .route.legacy, .switch[data-route="snow"] .route.snow{stroke-dasharray:10 9; animation:flow .9s linear infinite}
+.switch[data-route="legacy"] .route.snow, .switch[data-route="snow"] .route.legacy{stroke:var(--line); stroke-dasharray:2 7}
+.lever{stroke:var(--ink); stroke-width:7; stroke-linecap:round; transform-box:view-box; transform-origin:935px 135px; transition:transform .45s cubic-bezier(.5,1.6,.4,1)}
+.switch[data-route="legacy"] .lever{transform:rotate(180deg)}
+.switch[data-route="snow"] .lever{transform:rotate(90deg)}
+.hub{fill:var(--panel); stroke:var(--ink); stroke-width:3}
+@keyframes flow{to{stroke-dashoffset:-19}}
+
+.legend{display:flex; flex-wrap:wrap; gap:8px 18px; margin:14px 0 0; padding:0; list-style:none; color:var(--muted); font-size:.9rem}
+.legend li{display:flex; align-items:center; gap:8px}
+.legend i{display:inline-block; width:14px; height:14px; border-radius:3px; border:1.5px solid}
+
+.split{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; margin-top:20px}
+.col{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; min-width:0}
+.col h3{margin:0 0 10px; font-size:1.05rem; display:flex; align-items:center; gap:10px}
+.pill{font-size:.75rem; font-weight:700; padding:2px 10px; border-radius:999px}
+.pill.ok{background:var(--snow-soft); color:var(--snow)}
+.pill.as{background:var(--gate-soft); color:var(--gate)}
+.col ul{margin:0; padding:0; list-style:none; display:grid; gap:8px}
+.col li{padding-left:16px; position:relative; font-size:.95rem}
+.col li::before{content:""; position:absolute; left:0; top:.6em; width:7px; height:7px; border-radius:50%; background:var(--line)}
+.col.confirmed li::before{background:var(--snow)}
+.col.assumed li::before{background:var(--gate)}
+
+.qs{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin-top:20px}
+.qs div{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; min-width:0}
+.qs .n{font-stretch:72%; font-weight:800; font-size:2.3rem; line-height:1; color:var(--gate)}
+.qs h3{margin:8px 0 6px; font-size:1.05rem}
+.qs p{color:var(--muted); font-size:.93rem; margin:0}
+footer{color:var(--muted); font-size:.88rem; margin-top:48px}
+@media (max-width:640px){ .hero{padding-top:34px} .fig{padding:12px} }
+@media (prefers-reduced-motion: reduce){ .switch .route{animation:none !important} .lever,.route{transition:none} }
+.tbl{overflow-x:auto; margin-top:20px; background:var(--panel); border:1px solid var(--line); border-radius:12px}
+table{border-collapse:collapse; width:100%; min-width:760px; font-size:.92rem}
+th,td{text-align:left; vertical-align:top; padding:11px 14px; border-bottom:1px solid var(--line)}
+thead th{font-size:.76rem; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700}
+tbody th{font-weight:650} tbody th a{color:var(--ink)}
+tbody tr:last-child th,tbody tr:last-child td{border-bottom:0}
+tr.warn{background:var(--bad-soft)}
+.chip{display:inline-block; font-size:.78rem; font-weight:700; padding:2px 9px; border-radius:999px; margin:0 4px 4px 0; white-space:nowrap; text-decoration:none}
+.chip.keep{background:color-mix(in srgb, var(--ok) 16%, transparent); color:var(--ok)}
+.chip.new{background:var(--snow-soft); color:var(--snow)}
+.chip.risk{background:var(--gate-soft); color:var(--gate)}
+.chip.bad{background:var(--bad-soft); color:var(--bad)}
+.scroll{overflow-x:auto} .scroll svg{min-width:860px}
+.dg .box.t1{stroke:var(--ink); stroke-width:2}
+.dg.tl .band{fill:var(--gate-soft); stroke:var(--gate); stroke-width:1.5}
+.dg.tl .band-unk{fill:var(--tile); stroke:var(--line); stroke-dasharray:6 5}
+.dg.tl .band-lab{fill:var(--gate)}
+.dg.tl .bar-l{fill:var(--legacy-soft); stroke:var(--legacy); stroke-width:1.5}
+.dg.tl .bar-lb{fill:none; stroke:var(--legacy); stroke-width:1.5; stroke-dasharray:6 4}
+.dg.tl .bar-n{fill:var(--snow-soft); stroke:var(--snow); stroke-width:1.5}
+.dg.tl .bar-unk{fill:none; stroke:var(--line); stroke-width:1.5; stroke-dasharray:4 4}
+.dg.tl .bar-txt{fill:var(--ink); paint-order:stroke; stroke:var(--panel); stroke-width:5px; stroke-linejoin:round}
+.dg.tl .band-lab{paint-order:stroke; stroke:var(--panel); stroke-width:5px; stroke-linejoin:round}
+.dg.tl .xmark{stroke:var(--bad); stroke-width:3; fill:none}
+.dg.tl .mk{stroke:var(--ink); stroke-width:2; stroke-dasharray:5 4}
+.dg.tl .mk-decom{stroke:var(--legacy)} .dg.tl .mk-bad{stroke:var(--bad); stroke-width:3; stroke-dasharray:none} .dg.tl .mk-unk{stroke:var(--muted)}
+.dg.tl .mk-t{fill:var(--ink); font-weight:600} .dg.tl .mk-t-decom{fill:var(--legacy)} .dg.tl .mk-t-bad{fill:var(--bad)} .dg.tl .mk-t-unk{fill:var(--muted)}
+.dg.tl .st{stroke-width:2}
+.dg.tl .st-new{fill:var(--snow); stroke:var(--snow)} .dg.tl .st-legacy{fill:var(--legacy); stroke:var(--legacy)}
+.dg.tl .st-gate{fill:var(--gate); stroke:var(--gate)} .dg.tl .st-par{fill:var(--gate); stroke:var(--gate)}
+.dg.tl .st-bad{fill:var(--bad); stroke:var(--bad)} .dg.tl .st-unk{fill:var(--muted); stroke:var(--muted)}
+.dg.tl .st-n{fill:var(--on-accent); font-size:13px}
+.stepcards{list-style:none; margin:16px 0 0; padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px}
+.stepcards li{display:grid; grid-template-columns:30px 1fr; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; min-width:0}
+.stepcards .sn{display:grid; place-items:center; width:26px; height:26px; border-radius:50%; color:var(--on-accent); font-weight:800; font-size:.85rem}
+.stepcards strong{display:block; font-size:.98rem} .stepcards span{color:var(--muted); font-size:.9rem}
+.k-new .sn{background:var(--snow)} .k-legacy .sn{background:var(--legacy)} .k-gate .sn,.k-par .sn{background:var(--gate)} .k-bad .sn{background:var(--bad)} .k-unk .sn{background:var(--muted)}
+.tl-legend{display:flex; flex-wrap:wrap; gap:6px 16px; list-style:none; padding:0; margin:12px 0 0; color:var(--muted); font-size:.85rem}
+.tl-legend li{display:flex; align-items:center; gap:6px}
+.tl-legend i{display:inline-block; width:12px; height:12px; border-radius:50%}
+.chips{margin-top:18px; display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:.9rem; color:var(--muted)}
+.chips a{margin-left:4px}
+.stages{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; margin-top:20px}
+.stages article{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; min-width:0}
+.stages header{display:flex; align-items:center; gap:12px}
+.stages h3{margin:0; font-size:1.1rem}
+.sn2{display:grid; place-items:center; width:34px; height:34px; border-radius:50%; color:var(--on-accent); font-weight:800; flex:none}
+.sn2.g{background:var(--gate)} .sn2.n{background:var(--snow)} .sn2.l{background:var(--legacy)}
+.stages p{color:var(--muted); font-size:.94rem; margin:12px 0}
+.stages dl{margin:0; display:grid; grid-template-columns:96px 1fr; gap:6px 10px; font-size:.9rem}
+.stages dt{font-weight:700; color:var(--ink)} .stages dd{margin:0; color:var(--muted)}
+.dg .route-s{fill:none; stroke:var(--snow); stroke-width:4.5; stroke-linecap:round; stroke-dasharray:10 9; animation:flow .9s linear infinite}
+.dg .wb{stroke-width:1.5} .dg .wb.ok{fill:color-mix(in srgb, var(--ok) 14%, transparent); stroke:var(--ok)} .dg .wb.mid{fill:var(--gate-soft); stroke:var(--gate)} .dg .wb.bad{fill:var(--bad-soft); stroke:var(--bad)}
+.qs{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-top:20px}
+.qs div{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; min-width:0}
+.qs .n{font-stretch:72%; font-weight:800; font-size:2.2rem; line-height:1; color:var(--gate)}
+.qs h3{margin:8px 0 6px; font-size:1.05rem} .qs p{color:var(--muted); font-size:.93rem; margin:0}
+@media (prefers-reduced-motion: reduce){ .dg .route-s{animation:none} }
+.dg .zone.legacy-z{stroke:var(--legacy)} .dg .zone.snow-z{stroke:var(--snow)} .dg .snow-w{stroke:var(--snow); stroke-width:2}
+.facts{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-top:16px}
+.facts>div{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; display:grid; gap:4px; min-width:0}
+.facts span{color:var(--muted); font-size:.92rem}
+.cfg{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px; margin-top:16px}
+.cfg>div{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; display:grid; gap:6px; min-width:0}
+.cfg .k{font-stretch:72%; font-weight:800; font-size:1.8rem; line-height:1; color:var(--snow)} .cfg span:last-child{color:var(--muted); font-size:.92rem}
+h3.th{display:flex; align-items:center; gap:10px; margin:30px 0 0; font-size:1.15rem}
+table.ts td:first-child{font-family:var(--mono); font-size:.82rem; color:var(--muted); white-space:nowrap; width:56px}
+table.ts td:nth-child(2){font-weight:600; width:22%}
+table.ts td:nth-child(4){width:24%}
+code{font-family:var(--mono); font-size:.86em; background:var(--tile); padding:1px 5px; border-radius:4px; overflow-wrap:anywhere}
+table.objs{min-width:1000px} table.objs tbody th{width:20%} table.objs tbody th .chip{display:block; width:max-content; margin-top:6px}
+table.objs td{font-size:.88rem}
+.codebox{margin-top:16px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 18px; overflow-x:auto}
+.cb-h{font-weight:700; margin:0 0 8px} .codebox pre{margin:0} .codebox code{background:none; padding:0; font-size:.84rem; line-height:1.6; overflow-wrap:normal}
+.rules{list-style:none; margin:22px 0 0; padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px}
+.rules li{background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--snow); border-radius:10px; padding:12px 14px; font-size:.93rem; color:var(--muted)}
+.rules strong{display:block; color:var(--ink); margin-bottom:2px}
+.dg .legacy-w{stroke:var(--legacy); stroke-width:2.5} .dg .snow-w{stroke:var(--snow); stroke-width:2.5}
+.rn .only-before,.rn .only-after{transition:opacity .35s}
+.rn[data-state="before"] .only-after{opacity:0; visibility:hidden}
+.rn[data-state="after"] .only-before{opacity:0; visibility:hidden}
+.rn .route{stroke-dasharray:10 9; animation:flow .9s linear infinite}
+@media (prefers-reduced-motion: reduce){ .rn .route{animation:none} }
+.steps-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin:16px 0}
+.steps-row>div{background:var(--panel); border:1px solid var(--line); border-top:4px solid var(--snow); border-radius:10px; padding:12px 14px; display:grid; gap:4px; min-width:0}
+.steps-row .when{font-family:var(--mono); font-size:.75rem; color:var(--gate); text-transform:uppercase; letter-spacing:.05em}
+.steps-row span:last-child{color:var(--muted); font-size:.9rem}
+.callout.strong{background:var(--gate-soft); border:1px solid var(--gate); border-radius:12px; padding:14px 18px; margin:14px 0 4px; max-width:90ch}
+.limits{color:var(--muted); font-size:.95rem; padding-left:20px; max-width:84ch; display:grid; gap:6px}
+table.types tbody th{width:18%}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-ink" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-gate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<script>
+/* Shared timeline renderer: legacy and new lanes, parallel band, numbered steps, markers. Positions are 0..100 (schematic). */
+function tlX(p){ return 160 + p * 9; }
+function tlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function renderTimeline(c){
+  var o = [];
+  o.push('<svg class="dg tl" viewBox="0 0 1100 280" role="img" aria-label="' + tlEsc(c.aria || ('Timeline of how ' + c.name + ' went live')) + '">');
+  // parallel band
+  if (c.parallel){
+    var p = c.parallel, x1 = tlX(p.from), x2 = tlX(p.to);
+    o.push('<rect x="'+x1+'" y="62" width="'+(x2-x1)+'" height="136" rx="6" class="band'+(p.unknown?' band-unk':'')+'"/>');
+    o.push('<text class="lab c band-lab" x="'+((x1+x2)/2)+'" y="54">'+tlEsc(p.label)+'</text>');
+  }
+  // lane labels
+  o.push('<text class="lab" x="10" y="100" style="fill:var(--legacy)">Legacy</text>');
+  o.push('<text class="lab" x="10" y="170" style="fill:var(--snow)">New platform</text>');
+  // legacy bar
+  var L = c.legacy, lEnd = L.backupFrom != null ? L.backupFrom : L.end;
+  o.push('<rect x="'+tlX(L.start)+'" y="80" width="'+(tlX(lEnd)-tlX(L.start))+'" height="30" rx="4" class="bar-l"/>');
+  o.push('<text class="s bar-txt" x="'+(tlX(L.start)+10)+'" y="100">'+tlEsc(L.label)+'</text>');
+  if (L.backupFrom != null){
+    o.push('<rect x="'+tlX(L.backupFrom)+'" y="80" width="'+(tlX(L.end)-tlX(L.backupFrom))+'" height="30" rx="4" class="bar-lb"/>');
+    o.push('<text class="s" x="'+(tlX(L.backupFrom)+8)+'" y="100" style="fill:var(--legacy)">'+tlEsc(L.backupLabel || 'backup')+'</text>');
+  }
+  if (L.endUnknown){
+    o.push('<rect x="'+tlX(L.end)+'" y="80" width="'+(tlX(100)-tlX(L.end))+'" height="30" rx="4" class="bar-unk"/>');
+    o.push('<text class="s c" x="'+((tlX(L.end)+tlX(100))/2)+'" y="100">end not published</text>');
+  } else if (L.end < 100 && !L.noX){
+    var xe = tlX(L.end);
+    o.push('<path d="M'+(xe-7)+',88 l14,14 M'+(xe+7)+',88 l-14,14" class="xmark"/>');
+  }
+  // new bar
+  var N = c.neu;
+  o.push('<rect x="'+tlX(N.start)+'" y="150" width="'+(tlX(N.end)-tlX(N.start))+'" height="30" rx="4" class="bar-n"/>');
+  o.push('<text class="s bar-txt" x="'+(tlX(N.start)+10)+'" y="170">'+tlEsc(N.label)+'</text>');
+  // markers
+  (c.marks || []).forEach(function(m, i){
+    var x = tlX(m.at), y = (i % 2 === 0) ? 236 : 260;
+    o.push('<line x1="'+x+'" y1="62" x2="'+x+'" y2="'+(y-14)+'" class="mk mk-'+m.kind+'"/>');
+    var anchor = m.at > 80 ? 'e' : (m.at < 12 ? '' : 'c');
+    o.push('<text class="s '+anchor+' mk-t mk-t-'+m.kind+'" x="'+x+'" y="'+y+'">'+tlEsc(m.label)+'</text>');
+  });
+  // step markers
+  (c.steps || []).forEach(function(s, i){
+    var x = tlX(s.at);
+    o.push('<circle cx="'+x+'" cy="130" r="12" class="st st-'+s.k+'"/>');
+    o.push('<text class="t sm c st-n" x="'+x+'" y="135">'+(i+1)+'</text>');
+  });
+  o.push('</svg>');
+  return o.join('');
+}
+function renderSteps(c){
+  return '<ol class="stepcards">' + c.steps.map(function(s, i){
+    return '<li class="k-'+s.k+'"><span class="sn">'+(i+1)+'</span><div><strong>'+tlEsc(s.t)+'</strong><span>'+tlEsc(s.d)+'</span></div></li>';
+  }).join('') + '</ol>';
+}
+</script>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <marker id="ah-snow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path style="fill:var(--snow)" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path style="fill:var(--bad)" d="M0,0 L10,5 L0,10 z"/></marker>
+  <marker id="ah-legacy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path style="fill:var(--legacy)" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs></svg>
+<main>
+<header class="hero">
+  <p class="eyebrow">LIQ migration · comprehensive approach</p>
+  <h1>How the tier-1 migration is performed</h1>
+  <p class="lede">This is everything agreed so far, in one place. Snowflake takes over the Liquidity tier-1 interface tables, one switch group at a time, by renaming the Snowflake-fed table into the original name. Everything after tier-1 stays on SQL Server, unchanged. Parity with legacy is proven in UAT against production before production switches, because once a table switches, legacy stops feeding it.</p>
+  <ul class="rules">
+    <li><strong>Only tier-1 changes.</strong> Deposit enrichment, the other tier-2 processes and the reports aren't touched and can't be repointed.</li>
+    <li><strong>Same names, real tables.</strong> Tier-2 keeps reading <code>Transaction.TBLDeposits</code>. No synonyms.</li>
+    <li><strong>Designed per table.</strong> Switched in groups, so each tier-2 process reads one source.</li>
+    <li><strong>A one-way flow after the switch.</strong> Nothing flows from TDM_CDM into the legacy table any more. It's frozen as the rollback point.</li>
+    <li><strong>UAT is the only rehearsal.</strong> It's production-like, gets the same sources and holds full history. Production is the baseline.</li>
+    <li><strong>Liquidity stays on SQL Server for now.</strong> A parallel Liquidity database is a later phase.</li>
+  </ul>
+</header>
+
+<section aria-labelledby="h-arch">
+  <h2 id="h-arch">Where we are today</h2>
+  <p>Two three-layer platforms fed by the same sources. In UAT, DMVA copies Snowflake's tier-1 into the SnowIn schemas, and three reconciliations run every day. Production runs the legacy path only.</p>
+  <figure><div class="fig"><div class="scroll">
+    <svg class="dg" viewBox="0 0 1100 560" style="min-width:880px" role="img" aria-label="SQL Server: TDM_Staging to TDM_CDM with modules, LIQ schema procs, SSIS loads Liquidity tier-1. Snowflake: TDM_Staging to TDM_CDM, Liquidity procs load Snowflake tier-1. DMVA copies Snowflake tier-1 into SnowIn schemas. Three reconciliations compare the copies.">
+      <rect class="zone legacy-z" x="20" y="20" width="900" height="200" rx="10"/>
+      <text class="lab" x="36" y="44" style="fill:var(--legacy)">SQL Server · TDM server</text>
+      <rect class="box" x="40" y="70" width="150" height="80" rx="7"/><text class="m c" x="115" y="104">TDM_Staging</text><text class="s c" x="115" y="125">source data lands</text>
+      <line class="wire" x1="190" y1="110" x2="226" y2="110" marker-end="url(#ah-ink)"/>
+      <rect class="box legacy" x="230" y="55" width="290" height="140" rx="7"/><text class="m c" x="375" y="82">TDM_CDM</text>
+      <text class="s c" x="375" y="106">enrichment · logical relationships</text><text class="s c" x="375" y="126">GL segments · plugs and recs · BEIs</text><text class="s c" x="375" y="146">customer model and segmentation</text><text class="s c" x="375" y="172">keys created here</text>
+      <line class="wire" x1="520" y1="110" x2="556" y2="110" marker-end="url(#ah-ink)"/>
+      <rect class="box legacy" x="560" y="60" width="170" height="100" rx="7"/><text class="t sm c" x="645" y="88">LIQ schema procs</text><text class="s c" x="645" y="110">deposits · loans · ASec</text><text class="s c" x="645" y="130">derivatives · FX</text><text class="s c" x="645" y="150">in TDM_CDM</text>
+      <line class="wire" x1="730" y1="110" x2="766" y2="110" marker-end="url(#ah-ink)"/>
+      <rect class="box" x="770" y="60" width="140" height="100" rx="7"/><text class="t sm c" x="840" y="88">SSIS</text><text class="s c" x="840" y="110">dtexec + config</text><text class="s c" x="840" y="130">alias to TDM_CDM</text><text class="s c" x="840" y="150">slow step</text>
+
+      <rect class="box" x="40" y="250" width="150" height="56" rx="7"/><text class="t sm c" x="115" y="283">Source systems</text>
+      <line class="wire" x1="115" y1="250" x2="115" y2="154" marker-end="url(#ah-ink)"/>
+      <line class="wire" x1="115" y1="306" x2="115" y2="396" marker-end="url(#ah-ink)"/>
+
+      <rect class="zone snow-z" x="20" y="340" width="700" height="200" rx="10"/>
+      <text class="lab" x="36" y="364" style="fill:var(--snow)">Snowflake</text>
+      <rect class="box" x="40" y="400" width="150" height="80" rx="7"/><text class="m c" x="115" y="434">TDM_Staging</text><text class="s c" x="115" y="455">same sources</text>
+      <line class="wire" x1="190" y1="440" x2="226" y2="440" marker-end="url(#ah-ink)"/>
+      <rect class="box snow" x="230" y="385" width="290" height="120" rx="7"/><text class="m c" x="375" y="412">TDM_CDM</text><text class="s c" x="375" y="436">same modules, recalculated</text><text class="s c" x="375" y="456">Liquidity schema procs</text><text class="s c" x="375" y="482">own keys</text>
+      <line class="wire" x1="520" y1="440" x2="556" y2="440" marker-end="url(#ah-ink)"/>
+      <rect class="box snow" x="560" y="400" width="150" height="80" rx="7"/><text class="t sm c" x="635" y="432">DAL Liquidity</text><text class="s c" x="635" y="453">tier-1 only, no history</text>
+
+      <rect class="zone" x="740" y="250" width="340" height="290" rx="10"/>
+      <text class="lab" x="850" y="274">Liquidity server (DAL)</text>
+      <rect class="box" x="760" y="290" width="140" height="100" rx="7"/><text class="t sm c" x="830" y="318">Tier-1</text><text class="s c" x="830" y="340">Transaction</text><text class="s c" x="830" y="358">Reference · Config</text><text class="s c" x="830" y="376">identity keys, history</text>
+      <rect class="box snow" x="930" y="290" width="140" height="100" rx="7"/><text class="t sm c" x="1000" y="318">SnowIn</text><text class="s c" x="1000" y="340">Transactions</text><text class="s c" x="1000" y="358">Reference · Configs</text><text class="s c" x="1000" y="376">same structures</text>
+      <rect class="box" x="760" y="430" width="140" height="80" rx="7"/><text class="t sm c" x="830" y="462">Tier-2</text><text class="s c" x="830" y="482">joins on codes</text>
+      <line class="wire" x1="830" y1="390" x2="830" y2="426" marker-end="url(#ah-ink)"/>
+      <path class="wire" d="M840,160 V230 H830 V286" marker-end="url(#ah-ink)"/>
+
+      <path class="wire snow-w" d="M635,480 V525 H1000 V394" marker-end="url(#ah-snow)"/>
+      <text class="lab" x="1010" y="470" style="fill:var(--snow)">DMVA</text>
+
+      <circle cx="960" cy="525" r="12" class="f-gate"/><text class="t sm c f-on" x="960" y="530">1</text>
+      <path class="wire gate dash" d="M635,400 V330 H756"/>
+      <circle cx="700" cy="330" r="12" class="f-gate"/><text class="t sm c f-on" x="700" y="335">2</text>
+      <line class="wire gate dash" x1="900" y1="340" x2="930" y2="340"/>
+      <circle cx="915" cy="315" r="12" class="f-gate"/><text class="t sm c f-on" x="915" y="320">3</text>
+    </svg></div>
+    <ul class="tl-legend"><li><i style="background:var(--gate)"></i>1 Snowflake tier-1 against SnowIn: the DMVA copy</li><li><i style="background:var(--gate)"></i>2 Snowflake tier-1 against SQL Server tier-1: parity</li><li><i style="background:var(--gate)"></i>3 SnowIn against SQL Server tier-1: two-way check</li></ul>
+  </div></figure>
+  <div class="facts">
+    <div><strong>Load mechanics</strong><span>Control-M runs a wrapper, which runs dtexec with the SQL Server config. Each package deletes the business date in tier-1, runs the LIQ proc through the alias, and streams the result set into tier-1.</span></div>
+    <div><strong>Keys</strong><span>Keys are created in each platform's CDM and differ between them. Tier-1 rows get identity values when inserted. Tier-2 joins on codes, not IDs.</span></div>
+    <div><strong>Timing</strong><span>Snowflake output and the DMVA copy land earlier than the legacy path, because SSIS is the slow step.</span></div>
+    <div><strong>Ownership</strong><span>The project team owns Config and can change anything. Any repoint changes the SSIS config and the alias together.</span></div>
+  </div>
+</section>
+
+<section aria-labelledby="h-switch" class="sw-sec">
+  <h2 id="h-switch">The switch, for one table</h2>
+  <p>Tier-2 always reads <code>Transaction.TBLDeposits</code>. Only what sits behind that name changes. After the switch, the legacy flow stops.</p>
+  <figure>
+    <div class="fig rn" id="rn" data-state="before">
+      <div class="switch-head">
+        <div class="toggle" role="group" aria-label="Before or after the switch">
+          <button type="button" data-state="before" data-route="legacy" aria-pressed="true">Before switch</button>
+          <button type="button" data-state="after" data-route="snow" aria-pressed="false">After switch</button>
+        </div>
+        <p class="state" id="rnState"><span class="dot" style="background:var(--legacy)"></span>Tier-2 reads legacy data</p>
+      </div>
+      <div class="scroll">
+      <svg class="dg" viewBox="0 0 1100 420" style="min-width:880px" role="img" aria-labelledby="rnTitle">
+        <title id="rnTitle">Before the switch, DMVA loads SnowInTransactions.TBLDeposits and SSIS loads Transaction.TBLDeposits from TDM_CDM, which tier-2 reads. After the switch, DMVA loads Transaction.TBLDeposits with Snowflake data, which tier-2 reads, the SSIS job is disabled, and the legacy table sits frozen in LegacyTransactions as the rollback point.</title>
+        <rect class="zone" x="320" y="16" width="470" height="388" rx="10"/>
+        <text class="lab" x="336" y="396">Liquidity database</text>
+        <rect class="box snow" x="20" y="60" width="210" height="80" rx="7"/><text class="t c" x="125" y="94">Snowflake tier-1</text><text class="s c" x="125" y="116">copied in by DMVA</text>
+        <rect class="box legacy" x="20" y="280" width="210" height="80" rx="7"/><text class="t c" x="125" y="314">TDM_CDM LIQ proc</text><text class="s c" x="125" y="336">run by SSIS</text>
+        <text class="lab" x="360" y="44">SnowInTransactions</text>
+        <text class="lab" x="360" y="164">Transaction</text>
+        <text class="lab" x="360" y="294">LegacyTransactions</text>
+        <g class="only-before">
+          <rect class="box snow" x="360" y="52" width="400" height="66" rx="7"/><text class="m c" x="560" y="80">TBLDeposits</text><text class="s c" x="560" y="101">Snowflake data, compared only</text>
+          <rect class="box legacy" x="360" y="172" width="400" height="76" rx="7" style="stroke-width:3"/><text class="m c" x="560" y="204">TBLDeposits</text><text class="s c" x="560" y="226">legacy data</text>
+          <rect x="360" y="302" width="400" height="66" rx="7" fill="none" style="stroke:var(--line)" stroke-width="1.5" stroke-dasharray="5 4"/><text class="s c" x="560" y="340">empty</text>
+          <path class="route snow" d="M230,100 H290 V85 H356"/>
+          <path class="route legacy" d="M230,320 H300 V210 H356"/>
+          <line class="wire legacy-w" x1="760" y1="210" x2="866" y2="210" marker-end="url(#ah-legacy)"/>
+        </g>
+        <g class="only-after">
+          <rect x="360" y="52" width="400" height="66" rx="7" fill="none" style="stroke:var(--line)" stroke-width="1.5" stroke-dasharray="5 4"/><text class="s c" x="560" y="90">empty</text>
+          <rect class="box snow" x="360" y="172" width="400" height="76" rx="7" style="stroke-width:3"/><text class="m c" x="560" y="204">TBLDeposits</text><text class="s c" x="560" y="226">Snowflake data, history carried over</text>
+          <rect class="box legacy" x="360" y="302" width="400" height="66" rx="7" stroke-dasharray="6 4"/><text class="m c" x="560" y="330">TBLDeposits</text><text class="s c" x="560" y="351">frozen at D-1, rollback point only</text>
+          <path class="route snow" d="M230,100 H300 V210 H356"/>
+          <line x1="236" y1="320" x2="300" y2="320" style="stroke:var(--line)" stroke-width="3" stroke-dasharray="2 6"/>
+          <path d="M256,306 l28,28 M284,306 l-28,28" style="stroke:var(--bad)" stroke-width="3"/>
+          <text class="s f-bad" x="125" y="384" text-anchor="middle">SSIS job disabled</text>
+          <line class="wire snow-w" x1="760" y1="210" x2="866" y2="210" marker-end="url(#ah-snow)"/>
+        </g>
+        <rect class="box" x="870" y="170" width="210" height="80" rx="7"/><text class="t c" x="975" y="204">Deposit enrichment</text><text class="s c" x="975" y="226">tier-2, unchanged</text>
+        <text class="s c" x="813" y="196">reads</text>
+      </svg>
+      </div>
+    </div>
+    <figcaption id="rnCaption" aria-live="polite">Before: SSIS loads Transaction.TBLDeposits from TDM_CDM, and deposit enrichment reads it. DMVA's Snowflake copy sits in SnowInTransactions and is only compared.</figcaption>
+  </figure>
+</section>
+
+<section aria-labelledby="h-unit">
+  <h2 id="h-unit">The unit of migration: a switch group</h2>
+  <p>Every step is defined for one table. Tables are switched together when the same tier-2 process reads them, so no tier-2 run mixes Snowflake-fed and legacy-fed inputs within one group.</p>
+  <figure><div class="fig"><div class="scroll">
+    <svg class="dg" viewBox="0 0 1100 300" style="min-width:860px" role="img" aria-label="The Deposits switch group contains Transaction.TBLDeposits plus the Reference and Config tables deposit enrichment reads; the group switches together. Other groups such as Loans, asset securities, derivatives and FX follow.">
+      <rect class="zone snow-z" x="20" y="20" width="620" height="260" rx="10"/><text class="lab" x="36" y="44" style="fill:var(--snow)">Deposits switch group · switches together</text>
+      <rect class="box snow" x="40" y="64" width="280" height="60" rx="7"/><text class="m c" x="180" y="92">Transaction.TBLDeposits</text><text class="s c" x="180" y="112">transaction · history</text>
+      <rect class="box snow" x="40" y="138" width="280" height="60" rx="7"/><text class="m c" x="180" y="166">Reference.&lt;tables it reads&gt;</text><text class="s c" x="180" y="186">reference · truncate and reload</text>
+      <rect class="box snow" x="40" y="212" width="280" height="56" rx="7"/><text class="m c" x="180" y="238">Config.&lt;tables it reads&gt;</text><text class="s c" x="180" y="256">config · team-maintained</text>
+      <line class="wire" x1="320" y1="94" x2="406" y2="160" marker-end="url(#ah-ink)"/><line class="wire" x1="320" y1="168" x2="406" y2="168" marker-end="url(#ah-ink)"/><line class="wire" x1="320" y1="240" x2="406" y2="176" marker-end="url(#ah-ink)"/>
+      <rect class="box" x="410" y="132" width="210" height="70" rx="7"/><text class="t sm c" x="515" y="162">Deposit enrichment</text><text class="s c" x="515" y="182">and its reports</text>
+      <text class="lab" x="680" y="44">Then the next groups</text>
+      <rect class="box" x="680" y="64" width="190" height="44" rx="7"/><text class="t sm c" x="775" y="91">Loans group</text>
+      <rect class="box" x="890" y="64" width="190" height="44" rx="7"/><text class="t sm c" x="985" y="91">Asset securities group</text>
+      <rect class="box" x="680" y="122" width="190" height="44" rx="7"/><text class="t sm c" x="775" y="149">Derivatives group</text>
+      <rect class="box" x="890" y="122" width="190" height="44" rx="7"/><text class="t sm c" x="985" y="149">FX group</text>
+      <text class="s" x="680" y="200">A Reference table shared by several groups switches</text>
+      <text class="s" x="680" y="220">with the first group that reads it. Codes match on both</text>
+      <text class="s" x="680" y="240">platforms, so later groups can read it safely.</text>
+    </svg></div></div>
+    <figcaption>The tables in each group come from the list of tier-1 tables each tier-2 process reads. That mapping is still to be confirmed.</figcaption>
+  </figure>
+  <div class="tbl"><table class="types">
+    <thead><tr><th>Table type</th><th>Loaded today</th><th>Daily load after the switch</th><th>Before switching</th><th>Rollback catch-up</th></tr></thead>
+    <tbody>
+      <tr><th>Transaction<br><code>Transaction.TBLDeposits</code></th><td>SSIS deletes the business date and reloads it</td><td>DMVA deletes the date and inserts it, in one transaction</td><td>Copy all history with the original identity values, then reseed above the legacy maximum</td><td>Rerun legacy for each live date</td></tr>
+      <tr><th>Reference<br><code>Reference.&lt;table&gt;</code></th><td>SSIS truncates and reloads</td><td>DMVA truncates and reloads</td><td>No history to copy. Confirm no table stores these IDs across dates, since tier-2 joins on codes.</td><td>One legacy reload</td></tr>
+      <tr><th>Config<br><code>Config.&lt;table&gt;</code></th><td>Maintained by the project team</td><td>Snowflake becomes the master, and DMVA copies it</td><td>Freeze edits, copy current rows, reconcile</td><td>Restore the frozen copy</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section aria-labelledby="h-tl">
+  <h2 id="h-tl">The phases, for one switch group</h2>
+  <p>UAT runs against production's numbers right up to the production switch. After that, the legacy table is frozen and only serves as a rollback point until close-out.</p>
+  <figure><div class="fig"><div class="scroll" id="liqTl"></div>
+    <ul class="tl-legend"><li><i style="background:var(--snow)"></i>Snowflake step</li><li><i style="background:var(--legacy)"></i>legacy step</li><li><i style="background:var(--gate)"></i>check or parallel</li></ul></div>
+    <figcaption>Schematic, not to scale. Each phase ends on a gate, not a date.</figcaption></figure>
+  <div id="liqSteps"></div>
+  <div class="stages">
+    <article><header><span class="sn2 g">0</span><h3>Readiness</h3></header>
+      <p>Structure parity for every table: identity, indexes, constraints and collation. A dependency and grants inventory. DMVA able to delete and insert, or truncate and reload, per table. Control-M changes and runbooks drafted. Rollback window and decision owner agreed.</p>
+      <dl><dt>Gate</dt><dd>All readiness checks pass for the group</dd></dl></article>
+    <article><header><span class="sn2 g">1</span><h3>UAT shadow (running now)</h3></header>
+      <p>Legacy loads tier-1, and DMVA loads SnowIn. The three-way reconciliation proves Snowflake matches legacy at tier-1, on business keys and codes.</p>
+      <dl><dt>Gate</dt><dd>At least 20 clean business days, including a month-end</dd></dl></article>
+    <article><header><span class="sn2 n">2</span><h3>UAT switch and interim testing</h3></header>
+      <p>Run the production cutover runbook in UAT for the group. Tier-2 then runs unchanged on Snowflake data, compared daily with production at tier-1, tier-2 output and report level, through a month-end and a quarter-end. Rehearse the rollback, including legacy catch-up of several live dates.</p>
+      <dl><dt>Gate · G1</dt><dd>Zero unexplained breaks, report owners signed off, rollback rehearsed and timed</dd></dl></article>
+    <article><header><span class="sn2 n">3</span><h3>Production switch</h3></header>
+      <p>The same runbook in production, in the evening after the D-1 batch, then the first Snowflake-fed business date with business checks of the key reports.</p>
+      <dl><dt>Gate</dt><dd>G1 passed for the group, and the decision owner signs go</dd></dl></article>
+    <article><header><span class="sn2 g">4</span><h3>Hypercare and rollback window</h3></header>
+      <p>Daily DMVA fidelity checks, day-on-day variance checks on tier-2 outputs, and report-owner review. The legacy table stays frozen and legacy TDM_CDM stays runnable, so a rollback is possible.</p>
+      <dl><dt>Gate · G2</dt><dd>Clean window through at least one month-end</dd></dl></article>
+    <article><header><span class="sn2 l">5</span><h3>Close-out</h3></header>
+      <p>Cold backup of the frozen legacy table, then drop it. Retire the group's SSIS packages and LIQ procs once nothing else uses them.</p>
+      <dl><dt>After</dt><dd>Fix forward only</dd></dl></article>
+  </div>
+</section>
+
+<section aria-labelledby="h-runbook">
+  <h2 id="h-runbook">Cutover runbook, for one table</h2>
+  <p>Identical in UAT and production. It runs in the evening after the D-1 legacy batch and tier-2 have finished, so D-1 is the last legacy-fed date.</p>
+  <div class="steps-row">
+    <div><span class="when">T-5 days</span><strong>Freeze and confirm</strong><span>Config freeze for the group's tables, G1 evidence confirmed, window and decision owner booked</span></div>
+    <div><span class="when">T-1 evening</span><strong>Prepare</strong><span>Empty the SnowIn table, copy legacy history to D-1 with identity values, reseed, verify counts and checksums</span></div>
+    <div><span class="when">T-1 evening</span><strong>Rename</strong><span>Two schema moves in one transaction, grants reapplied, a smoke-test read as the tier-2 login</span></div>
+    <div><span class="when">T-1 evening</span><strong>Rewire</strong><span>Disable the table's SSIS job, repoint DMVA to the renamed table, make tier-2 wait on the DMVA load and gate</span></div>
+    <div><span class="when">Day T</span><strong>First live date</strong><span>Snowflake, DMVA, gate, tier-2, reports, then business checks of the key reports</span></div>
+  </div>
+  <div class="codebox">
+    <p class="cb-h">Script for <code>Transaction.TBLDeposits</code></p>
+<pre><code>-- T-1 evening, after the D-1 legacy load and tier-2 have finished
+TRUNCATE TABLE SnowInTransactions.TBLDeposits;
+SET IDENTITY_INSERT SnowInTransactions.TBLDeposits ON;
+INSERT INTO SnowInTransactions.TBLDeposits (&lt;all columns&gt;)
+SELECT &lt;all columns&gt; FROM Transaction.TBLDeposits;          -- every business date up to D-1
+SET IDENTITY_INSERT SnowInTransactions.TBLDeposits OFF;
+DBCC CHECKIDENT ('SnowInTransactions.TBLDeposits', RESEED, &lt;max legacy id&gt;);
+-- verify: counts and checksums per business date match Transaction.TBLDeposits
+
+BEGIN TRAN;
+  ALTER SCHEMA LegacyTransactions TRANSFER Transaction.TBLDeposits;       -- legacy frozen at D-1
+  ALTER SCHEMA Transaction        TRANSFER SnowInTransactions.TBLDeposits;
+COMMIT;
+-- reapply grants on Transaction.TBLDeposits (a schema transfer drops them)
+-- Control-M: disable the TBLDeposits SSIS job; DMVA target -> Transaction.TBLDeposits;
+--            tier-2 in-condition -> DMVA load + gate
+
+-- ROLLBACK, inside the window only
+BEGIN TRAN;
+  ALTER SCHEMA SnowInTransactions TRANSFER Transaction.TBLDeposits;
+  ALTER SCHEMA Transaction        TRANSFER LegacyTransactions.TBLDeposits;
+COMMIT;
+-- reapply grants; re-enable SSIS; run the legacy load for every live date from T; rerun tier-2</code></pre>
+  </div>
+</section>
+
+<section aria-labelledby="h-daily">
+  <h2 id="h-daily">The daily run after the switch</h2>
+  <figure><div class="fig"><div class="scroll">
+    <svg class="dg" viewBox="0 0 1100 300" style="min-width:860px" role="img" aria-label="Control-M chain: Snowflake TDM chain, Snowflake tier-1, DMVA load per table, gate, tier-2, reports. A failed gate stops tier-2 and triggers rerun or rollback decision.">
+      <rect class="box snow" x="20" y="50" width="160" height="80" rx="7"/><text class="t sm c" x="100" y="84">Snowflake</text><text class="s c" x="100" y="104">staging, CDM, tier-1</text>
+      <line class="wire" x1="180" y1="90" x2="206" y2="90" marker-end="url(#ah-ink)"/>
+      <rect class="box snow" x="210" y="50" width="200" height="80" rx="7"/><text class="t sm c" x="310" y="84">DMVA load</text><text class="s c" x="310" y="104">delete date + insert, 1 txn</text>
+      <line class="wire" x1="410" y1="90" x2="436" y2="90" marker-end="url(#ah-ink)"/>
+      <polygon points="440,90 500,46 560,90 500,134" style="fill:var(--gate-soft);stroke:var(--gate)" stroke-width="2"/><text class="t sm c" x="500" y="86">Gate</text><text class="s c" x="500" y="104">fidelity</text>
+      <line class="wire" x1="560" y1="90" x2="596" y2="90" marker-end="url(#ah-ink)"/><text class="s c" x="578" y="78">pass</text>
+      <rect class="box" x="600" y="50" width="220" height="80" rx="7"/><text class="t sm c" x="710" y="84">Tier-2</text><text class="s c" x="710" y="104">deposit enrichment, unchanged</text>
+      <line class="wire" x1="820" y1="90" x2="846" y2="90" marker-end="url(#ah-ink)"/>
+      <rect class="box" x="850" y="50" width="230" height="80" rx="7"/><text class="t sm c" x="965" y="84">Reports</text><text class="s c" x="965" y="104">plus variance checks</text>
+      <line class="wire bad" x1="500" y1="134" x2="500" y2="186" marker-end="url(#ah-bad)"/><text class="s f-bad" x="512" y="164">fail</text>
+      <rect class="box bad" x="380" y="190" width="240" height="80" rx="7"/><text class="t sm c" x="500" y="222">Stop tier-2, alert</text><text class="s c" x="500" y="244">rerun DMVA, or decide on rollback</text>
+      <text class="s" x="20" y="180">Gate checks per table and date:</text>
+      <text class="s" x="20" y="200">counts, control totals and a hash</text>
+      <text class="s" x="20" y="220">against Snowflake tier-1, plus</text>
+      <text class="s" x="20" y="240">reference codes resolving</text>
+      <text class="s" x="660" y="180">The legacy SSIS job for the table is disabled.</text>
+      <text class="s" x="660" y="200">Other, unswitched groups keep their legacy chain</text>
+      <text class="s" x="660" y="220">until their own switch.</text>
+    </svg></div></div>
+  </figure>
+</section>
+
+<section aria-labelledby="h-evidence">
+  <h2 id="h-evidence">Where the evidence comes from</h2>
+  <div class="callout strong"><strong>Parity with legacy can only be proven before the production switch.</strong> Once a group switches, legacy no longer produces that data in production, so there is nothing to compare against there. All the parity evidence has to come from UAT against production, including a month-end and a quarter-end, before the production switch.</div>
+  <div class="tbl"><table>
+    <thead><tr><th>When</th><th>What is compared</th><th>Proves</th></tr></thead>
+    <tbody>
+      <tr><th>UAT shadow</th><td>Snowflake tier-1 against SnowIn, Snowflake tier-1 against SQL Server tier-1, and SnowIn against SQL Server tier-1</td><td>Snowflake reproduces tier-1, and DMVA copies it faithfully</td></tr>
+      <tr><th>UAT after switch</th><td>UAT tier-1, tier-2 outputs and reports against production, same date</td><td>Unchanged tier-2 gives production's answers on Snowflake data</td></tr>
+      <tr><th>Production after switch</th><td>DMVA fidelity against Snowflake tier-1, day-on-day variance of tier-2 outputs, report-owner review</td><td>The live load is complete and behaving normally</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section aria-labelledby="h-rollback">
+  <h2 id="h-rollback">Rollback, with no legacy flow running</h2>
+  <p>The legacy table is frozen at D-1, so renaming back alone would leave tier-2 without the live dates. Every rollback has a catch-up step, and the window is time-boxed.</p>
+  <figure><div class="fig"><div class="scroll">
+    <svg class="dg" viewBox="0 0 1100 330" style="min-width:860px" role="img" aria-label="Issue found within the window. If the load failed, rerun DMVA. If Snowflake data is wrong and fixable in time, fix in Snowflake and reload. Otherwise roll back: rename back, rerun legacy SSIS for each live date from TDM_CDM, rerun tier-2. After the window, fix forward only.">
+      <rect class="box bad" x="20" y="125" width="190" height="80" rx="7"/><text class="t sm c" x="115" y="158">Issue on day T+n</text><text class="s c" x="115" y="178">inside the window</text>
+      <line class="wire" x1="210" y1="165" x2="246" y2="165" marker-end="url(#ah-ink)"/>
+      <polygon points="250,165 330,115 410,165 330,215" style="fill:var(--gate-soft);stroke:var(--gate)" stroke-width="2"/><text class="t sm c" x="330" y="160">What's</text><text class="t sm c" x="330" y="178">wrong?</text>
+      <path class="wire" d="M330,115 V60 H476" marker-end="url(#ah-ink)"/><text class="s" x="342" y="52">load or transport</text><text class="s" x="342" y="138" style="display:none"></text>
+      <line class="wire" x1="410" y1="165" x2="476" y2="165" marker-end="url(#ah-ink)"/><text class="s c" x="443" y="154">fixable</text>
+      <path class="wire bad" d="M330,215 V270 H476" marker-end="url(#ah-bad)"/><text class="s f-bad" x="342" y="292">not fixable in time</text>
+      <rect class="box snow" x="480" y="25" width="280" height="70" rx="7"/><text class="t sm c" x="620" y="55">Rerun DMVA for the date</text><text class="s c" x="620" y="76">no rollback</text>
+      <rect class="box snow" x="480" y="130" width="280" height="70" rx="7"/><text class="t sm c" x="620" y="160">Fix in Snowflake, reload</text><text class="s c" x="620" y="181">then rerun tier-2</text>
+      <rect class="box bad" x="480" y="235" width="600" height="80" rx="7"/><text class="t sm" x="500" y="264">Roll back</text><text class="s" x="500" y="286">Rename back, re-enable SSIS, run legacy for every live date from T,</text><text class="s" x="500" y="304">then rerun tier-2. Needs legacy TDM_CDM to have processed those dates.</text>
+      <rect x="800" y="25" width="280" height="175" rx="8" class="wb mid"/><text class="t sm" x="820" y="55">Rules</text>
+      <text class="s" x="820" y="80">Window: agreed per group, e.g. to</text><text class="s" x="820" y="98">the first month-end after the switch</text>
+      <text class="s" x="820" y="124">One named owner decides</text>
+      <text class="s" x="820" y="150">Rehearsed in UAT with real catch-up</text>
+      <text class="s" x="820" y="176">After the window: fix forward only</text>
+    </svg></div></div>
+  </figure>
+</section>
+
+<section aria-labelledby="h-config">
+  <h2 id="h-config">Config and reruns</h2>
+  <div class="cfg">
+    <div><span class="k">1</span><strong>One master at a time</strong><span>SQL Server is the master until the group switches, then Snowflake. Never edit both.</span></div>
+    <div><span class="k">2</span><strong>Freeze around a switch</strong><span>No edits to the group's Config tables from T-5 to the end of the first week.</span></div>
+    <div><span class="k">3</span><strong>Previous-day reruns</strong><span>After the switch, rerun a date by having Snowflake reprocess it and DMVA reload it. This is possible only once history has been copied in.</span></div>
+    <div><span class="k">4</span><strong>Older dates</strong><span>Agree with the Snowflake team how far back a date can be reprocessed, since Snowflake keeps no tier-1 history.</span></div>
+  </div>
+</section>
+
+<section aria-labelledby="h-objects">
+  <h2 id="h-objects">Every object, by name</h2>
+  <div class="tbl"><table class="objs">
+    <thead><tr><th>Object</th><th>Before switch</th><th>After switch</th><th>After close-out</th></tr></thead>
+    <tbody>
+      <tr><th><code>Transaction.TBLDeposits</code><span class="chip keep">existing name</span></th><td>Legacy table, loaded by SSIS, read by tier-2</td><td>The Snowflake-fed table, carrying its history. DMVA loads it and tier-2 reads it.</td><td>Unchanged</td></tr>
+      <tr><th><code>SnowInTransactions.TBLDeposits</code><span class="chip keep">existing</span></th><td>DMVA's copy, compared</td><td>Moved into <code>Transaction</code>, so the name is free</td><td>Recreate only if needed</td></tr>
+      <tr><th><code>LegacyTransactions.TBLDeposits</code><span class="chip risk">moved</span></th><td>n/a</td><td>The old table, frozen at D-1. Not loaded. Rollback point only.</td><td>Cold backup, then dropped</td></tr>
+      <tr><th>SSIS deposits package and Control-M job</th><td>Loads tier-1</td><td>Disabled but kept runnable for rollback</td><td>Retired</td></tr>
+      <tr><th>DMVA deposits job</th><td>Loads SnowIn</td><td>Loads <code>Transaction.TBLDeposits</code></td><td>Stays</td></tr>
+      <tr><th><code>TDM_CDM: LIQ.&lt;deposits proc&gt;</code></th><td>Run by SSIS</td><td>Not run, kept runnable</td><td>Retired, if no other users</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">New objects: the <code>LegacyTransactions</code> schema, and the equivalents for Reference and Config. Optionally, small control tables for reconciliation results and a per-date path marker.</p>
+</section>
+
+<section aria-labelledby="h-tests">
+  <h2 id="h-tests">Test scenarios, per switch group</h2>
+  <h3 class="th"><span class="sn2 g">0</span>Readiness</h3>
+  <div class="tbl"><table class="ts"><thead><tr><th>ID</th><th>Scenario</th><th>Pass when</th></tr></thead><tbody>
+    <tr><td>R-01</td><td>Structure parity: columns, identity definition, indexes, constraints and collation of each SnowIn table against the original</td><td>Identical</td></tr>
+    <tr><td>R-02</td><td>Dependency and grants inventory: sys.sql_expression_dependencies, triggers, schema-bound views, grants</td><td>All listed, with nothing bound to the object ID</td></tr>
+    <tr><td>R-03</td><td>DMVA capability: delete and insert per date atomically for Transaction tables, truncate and reload for Reference, target configurable per table</td><td>Demonstrated in UAT</td></tr>
+    <tr><td>R-04</td><td>Tier-2 to tier-1 mapping that defines the switch groups</td><td>Signed off</td></tr>
+  </tbody></table></div>
+  <h3 class="th"><span class="sn2 g">1</span>UAT shadow</h3>
+  <div class="tbl"><table class="ts"><thead><tr><th>ID</th><th>Scenario</th><th>Pass when</th></tr></thead><tbody>
+    <tr><td>S-01</td><td>Three-way reconciliation, value-level, on business keys and reference codes, never IDs</td><td>Zero unexplained breaks for 20+ days, including a month-end</td></tr>
+    <tr><td>S-02</td><td>Type fidelity: decimal and datetime precision, NULL against empty string, case</td><td>No unclassified breaks</td></tr>
+  </tbody></table></div>
+  <h3 class="th"><span class="sn2 n">2</span>UAT switch and interim testing</h3>
+  <div class="tbl"><table class="ts"><thead><tr><th>ID</th><th>Scenario</th><th>Pass when</th></tr></thead><tbody>
+    <tr><td>U-01</td><td>History copy: counts, checksums and identity values per business date</td><td>Identical to the legacy table</td></tr>
+    <tr><td>U-02</td><td>First DMVA load after the reseed</td><td>All new IDs above the legacy maximum</td></tr>
+    <tr><td>U-03</td><td>Rename in one transaction with a lock timeout, grants reapplied, timed</td><td>Inside the window, and tier-2 logins can read</td></tr>
+    <tr><td>U-04</td><td>Rewire: SSIS job disabled, DMVA writes to the renamed table, Control-M dependencies changed</td><td>Nothing writes to the frozen legacy table</td></tr>
+    <tr><td>U-05</td><td>DMVA load killed halfway</td><td>All or nothing</td></tr>
+    <tr><td>U-06</td><td>Gate fed missing or duplicate rows</td><td>Tier-2 doesn't start</td></tr>
+    <tr><td>U-07</td><td>UAT tier-1 against production, same date</td><td>Clean daily</td></tr>
+    <tr><td>U-08</td><td>Deposit enrichment output in UAT against production</td><td>Clean daily</td></tr>
+    <tr><td>U-09</td><td>Liquidity reports in UAT against production</td><td>Report owners sign off</td></tr>
+    <tr><td>U-10</td><td>Month-end, quarter-end and holiday dates</td><td>Clean on each</td></tr>
+    <tr><td>U-11</td><td>Previous-day rerun: Snowflake reprocesses, DMVA reloads</td><td>Matches the original</td></tr>
+    <tr><td>U-12</td><td>Rollback rehearsal after several live days: rename back, legacy catch-up of each live date, tier-2 rerun</td><td>Matches production, with the time recorded</td></tr>
+    <tr><td>U-13</td><td>Batch timing: Snowflake, DMVA, gate, tier-2</td><td>Inside the window</td></tr>
+  </tbody></table></div>
+  <h3 class="th"><span class="sn2 n">3</span>Production switch</h3>
+  <div class="tbl"><table class="ts"><thead><tr><th>ID</th><th>Scenario</th><th>Pass when</th></tr></thead><tbody>
+    <tr><td>P-01</td><td>Go/no-go: all U scenarios passed for the group, owner signs</td><td>Signed</td></tr>
+    <tr><td>P-02</td><td>Runbook executed as in UAT</td><td>Within the UAT timings</td></tr>
+    <tr><td>P-03</td><td>Smoke test as the tier-2 login, plus a path marker recorded</td><td>Reads, and recorded</td></tr>
+    <tr><td>P-04</td><td>First live date: fidelity gate, tier-2 run, key-report business check</td><td>Clean and signed</td></tr>
+  </tbody></table></div>
+  <h3 class="th"><span class="sn2 g">4</span>Hypercare and close-out</h3>
+  <div class="tbl"><table class="ts"><thead><tr><th>ID</th><th>Scenario</th><th>Pass when</th></tr></thead><tbody>
+    <tr><td>H-01</td><td>Daily fidelity and day-on-day variance of tier-2 outputs</td><td>Within thresholds</td></tr>
+    <tr><td>H-02</td><td>Rollback readiness: legacy TDM_CDM processed each live date, SSIS still runnable</td><td>Confirmed daily</td></tr>
+    <tr><td>C-01</td><td>Cold backup of the frozen legacy table, test-restored</td><td>Restores</td></tr>
+    <tr><td>C-02</td><td>No other users of the SSIS package, LIQ proc or legacy table</td><td>None, then retire</td></tr>
+  </tbody></table></div>
+</section>
+
+<section aria-labelledby="h-risks">
+  <h2 id="h-risks">Main risks</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>No parity check possible in production after the switch</td><td>All parity evidence from UAT against production first, including a month-end and a quarter-end. Fidelity and variance checks after.</td></tr>
+      <tr><td>Rollback needs legacy catch-up</td><td>Keep legacy TDM_CDM, the LIQ procs and SSIS runnable through the window. Rehearse catch-up in UAT. Time-box the window.</td></tr>
+      <tr><td>Identity clash between DMVA rows and legacy IDs</td><td>Empty the SnowIn table, copy history, reseed (U-01, U-02)</td></tr>
+      <tr><td>A tier-2 run mixing sources</td><td>Switch by group, using the tier-2 to tier-1 mapping</td></tr>
+      <tr><td>Hidden dependencies on the table object</td><td>Inventory (R-02), grants script, quiet window for the schema-wide lock</td></tr>
+      <tr><td>Snowflake or DMVA late, failed or partial</td><td>Atomic load, a gate before tier-2, alerting, rerun runbook</td></tr>
+      <tr><td>Config drift</td><td>A single master, a freeze, daily reconciliation</td></tr>
+      <tr><td>Old dates can't be rerun after the switch</td><td>Agree Snowflake reprocessing retention before G1</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section aria-labelledby="h-open">
+  <h2 id="h-open">Questions that shape the plan</h2>
+  <div class="qs">
+    <div><span class="n">1</span><h3>Does legacy TDM_CDM keep running?</h3><p>After a group switches, does legacy TDM_CDM still process each business date? Rollback catch-up depends on it.</p></div>
+    <div><span class="n">2</span><h3>Switch groups</h3><p>Which tier-1 tables does each tier-2 process read?</p></div>
+    <div><span class="n">3</span><h3>DMVA</h3><p>Can it delete and insert atomically per date, truncate and reload, and be retargeted per table?</p></div>
+    <div><span class="n">4</span><h3>Rollback window and owner</h3><p>How many days per group, and who decides?</p></div>
+    <div><span class="n">5</span><h3>Comparing UAT with production</h3><p>Can the reconciliation tool read both, or do production's numbers need copying into UAT?</p></div>
+    <div><span class="n">6</span><h3>Fourth SnowIn schema</h3><p>Name it, and add it to the groups.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="h-changed">
+  <h2 id="h-changed">What this replaces from earlier pages</h2>
+  <ul class="limits">
+    <li>The alias-based in-and-out step and thin LIQ procedures are no longer needed, because UAT provides the parallel run.</li>
+    <li>The synonym and blue/green ideas are dropped, because tier-2 must read real tables under their original names.</li>
+    <li>Legacy loading after the switch, through a shadow or backup table, is dropped. The legacy table is frozen at D-1 and rollback uses catch-up.</li>
+    <li>The research, case playbooks and strategy pages still stand as background.</li>
+  </ul>
+</section>
+
+<footer>LIQ tier-1 migration approach, 17 October 2026. Gate numbers and windows are suggestions for SteerCo to agree.</footer>
+</main>
+<script>
+(function(){
+  var LIQ = { name:'Switch group', aria:'Phases for one switch group: readiness, UAT shadow, UAT switch and interim testing against production, production switch, hypercare and rollback window, close-out.',
+    legacy:{start:0,end:90,label:'Legacy: TDM_CDM → LIQ proc → SSIS → tier-1',backupFrom:62,backupLabel:'frozen at D-1, rollback point'},
+    neu:{start:0,end:100,label:'Snowflake → DMVA → tier-1: UAT first, then production'},
+    parallel:{from:0,to:62,label:'UAT compared with production (legacy)'},
+    marks:[{at:18,label:'UAT switch',kind:'cut'},{at:62,label:'Production switch',kind:'cut'},{at:90,label:'Close-out',kind:'decom'}],
+    steps:[
+      {at:4,t:'Readiness',d:'Structure, dependencies, DMVA capability, switch groups.',k:'gate'},
+      {at:10,t:'UAT shadow',d:'Three-way reconciliation, running now.',k:'gate'},
+      {at:18,t:'UAT switch',d:'The production runbook, executed in UAT.',k:'new'},
+      {at:34,t:'Compare with production',d:'Tier-1, tier-2 output, reports, through a month-end and a quarter-end.',k:'par'},
+      {at:48,t:'Rollback rehearsal',d:'Rename back plus legacy catch-up, timed.',k:'gate'},
+      {at:62,t:'Production switch',d:'T-1 evening runbook, first live date on T.',k:'new'},
+      {at:76,t:'Hypercare',d:'Fidelity and variance checks, rollback window open.',k:'gate'},
+      {at:90,t:'Close-out',d:'Cold backup, drop the legacy table, retire SSIS and the procs.',k:'legacy'}]};
+  document.getElementById('liqTl').innerHTML = renderTimeline(LIQ);
+  document.getElementById('liqSteps').innerHTML = renderSteps(LIQ);
+})();
+(function(){
+  var fig=document.getElementById('rn'); if(!fig) return;
+  var btns=fig.querySelectorAll('.toggle button'), st=document.getElementById('rnState'), cap=document.getElementById('rnCaption');
+  var copy={before:{s:'Tier-2 reads legacy data',c:'var(--legacy)',cap:"Before: SSIS loads Transaction.TBLDeposits from TDM_CDM, and deposit enrichment reads it. DMVA's Snowflake copy sits in SnowInTransactions and is only compared."},
+            after:{s:'Tier-2 reads Snowflake data',c:'var(--snow)',cap:'After: the Snowflake-fed table, with history carried over, holds the name Transaction.TBLDeposits, and DMVA loads it daily. Deposit enrichment reads it unchanged. The SSIS job is disabled, and the old table sits frozen at D-1 in LegacyTransactions as the rollback point.'}};
+  function set(v){ fig.setAttribute('data-state',v); btns.forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.state===v));});
+    st.textContent=''; var d=document.createElement('span'); d.className='dot'; d.style.background=copy[v].c; st.appendChild(d); st.appendChild(document.createTextNode(copy[v].s)); cap.textContent=copy[v].cap; }
+  btns.forEach(function(b){ b.addEventListener('click',function(){ set(b.dataset.state); }); });
+})();
+</script>
+
+</html>

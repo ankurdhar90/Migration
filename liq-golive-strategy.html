@@ -1,0 +1,463 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LIQ Go-Live Strategy</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: one column of wide diagram panels, read top to bottom; matches the cutover page's visual vocabulary */
+:root{
+  --paper:#EEF1F4; --panel:#FFFFFF; --tile:#F5F7F9; --ink:#18222F; --muted:#586577; --line:#C3CCD6;
+  --legacy:#7B4FA3; --legacy-soft:#ECE3F5; --snow:#0B7A84; --snow-soft:#DDF1F2;
+  --gate:#A86300; --gate-soft:#FCEFD9; --bad:#B42318; --bad-soft:#FBE4E1; --ok:#2F7D32; --on-accent:#FFFFFF;
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#121920; --panel:#18212B; --tile:#1F2A36; --ink:#E4E9EE; --muted:#9AA6B3; --line:#34414F;
+    --legacy:#B58EDB; --legacy-soft:#2E2540; --snow:#4CC3CC; --snow-soft:#173539;
+    --gate:#E8A23D; --gate-soft:#3A2C14; --bad:#F2796B; --bad-soft:#3D1F1C; --ok:#79C47D; --on-accent:#121920;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121920; --panel:#18212B; --tile:#1F2A36; --ink:#E4E9EE; --muted:#9AA6B3; --line:#34414F;
+  --legacy:#B58EDB; --legacy-soft:#2E2540; --snow:#4CC3CC; --snow-soft:#173539;
+  --gate:#E8A23D; --gate-soft:#3A2C14; --bad:#F2796B; --bad-soft:#3D1F1C; --ok:#79C47D; --on-accent:#121920;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--display); font-size:17px; line-height:1.55; -webkit-font-smoothing:antialiased}
+main{max-width:1180px; margin:0 auto; padding-block:0 72px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.hero{padding:52px 0 4px}
+.eyebrow{font-family:var(--mono); font-size:.8rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 10px}
+h1{font-stretch:72%; font-weight:800; font-size:clamp(2.4rem,6.5vw,4.4rem); line-height:.98; letter-spacing:-.01em; margin:0 0 16px; max-width:15ch; text-wrap:balance}
+.lede{max-width:64ch; color:var(--muted); font-size:1.1rem; margin:0}
+section{padding:48px 0 8px; border-top:1px solid var(--line); margin-top:40px}
+h2{font-stretch:82%; font-weight:750; font-size:clamp(1.5rem,3.3vw,2.15rem); line-height:1.08; margin:0 0 10px; text-wrap:balance}
+p{max-width:68ch; margin:0 0 12px}
+figure{margin:22px 0 6px}
+.fig{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; overflow-x:auto}
+.fig svg{display:block; width:100%; height:auto}
+figcaption{color:var(--muted); font-size:.93rem; margin-top:10px; max-width:74ch}
+
+.dg text{font-family:var(--display)}
+.dg .t{font-size:16px; font-weight:650; fill:var(--ink)}
+.dg .sm{font-size:14px}
+.dg .s{font-size:13px; fill:var(--muted)}
+.dg .lab{font-size:13px; font-weight:700; fill:var(--muted)}
+.dg .m{font-family:var(--mono); font-size:13px; fill:var(--ink)}
+.dg .c{text-anchor:middle}
+.dg .e{text-anchor:end}
+.dg .box{fill:var(--tile); stroke:var(--line); stroke-width:1.5}
+.dg .box.legacy{stroke:var(--legacy); stroke-width:2}
+.dg .box.snow{stroke:var(--snow); stroke-width:2}
+.dg .box.gate{stroke:var(--gate); stroke-width:2; fill:var(--gate-soft)}
+.dg .box.bad{stroke:var(--bad); stroke-width:2; fill:var(--bad-soft)}
+.dg .fill-legacy{fill:var(--legacy-soft); stroke:var(--legacy); stroke-width:1.5}
+.dg .fill-snow{fill:var(--snow-soft); stroke:var(--snow); stroke-width:1.5}
+.dg .fill-tile{fill:var(--tile); stroke:var(--line); stroke-width:1.5}
+.dg .zone{fill:none; stroke:var(--line); stroke-width:1.5; stroke-dasharray:6 6}
+.dg .zone.legacy{stroke:var(--legacy)} .dg .zone.snow{stroke:var(--snow)}
+.dg .wire{fill:none; stroke:var(--ink); stroke-width:1.75}
+.dg .wire.muted{stroke:var(--muted)}
+.dg .wire.gate{stroke:var(--gate); stroke-width:2}
+.dg .wire.bad{stroke:var(--bad)}
+.dg .dash{stroke-dasharray:5 5}
+.dg .f-legacy{fill:var(--legacy)} .dg .f-snow{fill:var(--snow)} .dg .f-gate{fill:var(--gate)} .dg .f-bad{fill:var(--bad)} .dg .f-on{fill:var(--on-accent)}
+.ah-ink{fill:var(--ink)} .ah-muted{fill:var(--muted)} .ah-gate{fill:var(--gate)}
+
+.switch-head{display:flex; flex-wrap:wrap; gap:14px 20px; align-items:center; justify-content:space-between; margin-bottom:12px}
+.toggle{display:inline-flex; flex-wrap:wrap; border:1px solid var(--line); border-radius:999px; padding:4px; background:var(--tile); gap:4px}
+.toggle button{font:inherit; font-weight:650; font-size:.95rem; border:0; background:transparent; color:var(--muted); padding:8px 16px; border-radius:999px; cursor:pointer}
+.toggle button[aria-pressed="true"][data-route="legacy"]{background:var(--legacy); color:var(--on-accent)}
+.toggle button[aria-pressed="true"][data-route="snow"]{background:var(--snow); color:var(--on-accent)}
+.toggle button:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+.state{font-weight:650; margin:0}
+.state .dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; vertical-align:middle}
+.route{fill:none; stroke-width:4.5; stroke-linecap:round; stroke-linejoin:round; transition:stroke .3s, opacity .3s}
+.route.legacy{stroke:var(--legacy)} .route.snow{stroke:var(--snow)}
+.switch[data-route="legacy"] .route.legacy, .switch[data-route="snow"] .route.snow{stroke-dasharray:10 9; animation:flow .9s linear infinite}
+.switch[data-route="legacy"] .route.snow, .switch[data-route="snow"] .route.legacy{stroke:var(--line); stroke-dasharray:2 7}
+.lever{stroke:var(--ink); stroke-width:7; stroke-linecap:round; transform-box:view-box; transform-origin:935px 135px; transition:transform .45s cubic-bezier(.5,1.6,.4,1)}
+.switch[data-route="legacy"] .lever{transform:rotate(180deg)}
+.switch[data-route="snow"] .lever{transform:rotate(90deg)}
+.hub{fill:var(--panel); stroke:var(--ink); stroke-width:3}
+@keyframes flow{to{stroke-dashoffset:-19}}
+
+.legend{display:flex; flex-wrap:wrap; gap:8px 18px; margin:14px 0 0; padding:0; list-style:none; color:var(--muted); font-size:.9rem}
+.legend li{display:flex; align-items:center; gap:8px}
+.legend i{display:inline-block; width:14px; height:14px; border-radius:3px; border:1.5px solid}
+
+.split{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; margin-top:20px}
+.col{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; min-width:0}
+.col h3{margin:0 0 10px; font-size:1.05rem; display:flex; align-items:center; gap:10px}
+.pill{font-size:.75rem; font-weight:700; padding:2px 10px; border-radius:999px}
+.pill.ok{background:var(--snow-soft); color:var(--snow)}
+.pill.as{background:var(--gate-soft); color:var(--gate)}
+.col ul{margin:0; padding:0; list-style:none; display:grid; gap:8px}
+.col li{padding-left:16px; position:relative; font-size:.95rem}
+.col li::before{content:""; position:absolute; left:0; top:.6em; width:7px; height:7px; border-radius:50%; background:var(--line)}
+.col.confirmed li::before{background:var(--snow)}
+.col.assumed li::before{background:var(--gate)}
+
+.qs{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin-top:20px}
+.qs div{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; min-width:0}
+.qs .n{font-stretch:72%; font-weight:800; font-size:2.3rem; line-height:1; color:var(--gate)}
+.qs h3{margin:8px 0 6px; font-size:1.05rem}
+.qs p{color:var(--muted); font-size:.93rem; margin:0}
+footer{color:var(--muted); font-size:.88rem; margin-top:48px}
+@media (max-width:640px){ .hero{padding-top:34px} .fig{padding:12px} }
+@media (prefers-reduced-motion: reduce){ .switch .route{animation:none !important} .lever,.route{transition:none} }
+.stage .vis,.stage .fade-ig,.stage .fade-g{transition:opacity .35s}
+.stage[data-state="today"] .vis:not(.st-t),
+.stage[data-state="inout"] .vis:not(.st-i),
+.stage[data-state="golive"] .vis:not(.st-g){opacity:0; visibility:hidden}
+.stage[data-state="inout"] .fade-ig,.stage[data-state="golive"] .fade-ig{opacity:.35}
+.stage[data-state="golive"] .fade-g{opacity:.3}
+.stage .route,.bgr{stroke-dasharray:10 9; animation:flow .9s linear infinite}
+.lever{transform-origin:470px 105px}
+.stage[data-state="today"] .lever{transform:rotate(180deg)}
+.stage[data-state="inout"] .lever,.stage[data-state="golive"] .lever{transform:rotate(90deg)}
+.dg .box.t1{stroke:var(--ink); stroke-width:2}
+.stage[data-state="golive"] .box.t1{stroke:var(--snow)}
+.toggle button[aria-pressed="true"][data-state="today"]{background:var(--legacy); color:var(--on-accent)}
+.toggle button[aria-pressed="true"][data-state="inout"]{background:var(--snow); color:var(--on-accent)}
+.toggle button[aria-pressed="true"][data-state="golive"]{background:var(--gate); color:var(--on-accent)}
+.tbl{overflow-x:auto; margin-top:20px; background:var(--panel); border:1px solid var(--line); border-radius:12px}
+table{border-collapse:collapse; width:100%; min-width:820px; font-size:.94rem}
+th,td{text-align:left; vertical-align:top; padding:12px 14px; border-bottom:1px solid var(--line)}
+thead th{font-size:.78rem; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700}
+tbody th{font-weight:650; width:18%}
+tbody td:nth-child(2){color:var(--muted); width:28%}
+tbody tr:last-child th,tbody tr:last-child td{border-bottom:0}
+tr.pick{background:var(--snow-soft)} tr.pick th::after{content:" ★"; color:var(--snow)}
+tr.pre th{font-style:italic}
+.r{display:inline-block; font-size:.8rem; font-weight:700; padding:2px 10px; border-radius:999px; white-space:nowrap}
+.r.lo{background:color-mix(in srgb, var(--ok) 16%, transparent); color:var(--ok)}
+.r.md{background:var(--gate-soft); color:var(--gate)}
+.r.hi{background:var(--bad-soft); color:var(--bad)}
+.note{color:var(--muted); font-size:.93rem; margin-top:14px}
+.gates{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin-top:20px}
+.gates>div{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 20px; min-width:0}
+.gl{display:inline-grid; place-items:center; width:44px; height:44px; background:var(--gate-soft); color:var(--gate); font-weight:800; border:2px solid var(--gate); border-radius:6px}
+.gates h3{margin:14px 0 8px; font-size:1.05rem}
+.gates ul{margin:0; padding:0; list-style:none; display:grid; gap:7px}
+.gates li{padding-left:16px; position:relative; font-size:.93rem; color:var(--muted)}
+.gates li::before{content:""; position:absolute; left:0; top:.6em; width:7px; height:7px; border-radius:50%; background:var(--gate)}
+@media (prefers-reduced-motion: reduce){ .stage .route,.bgr{animation:none} }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-ink" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-gate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path class="ah-gate" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path style="fill:var(--bad)" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ah-snow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path style="fill:var(--snow)" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">LIQ migration · go-live strategy for SteerCo</p>
+  <h1>Three states, each one reversible</h1>
+  <p class="lede">Tier-1 moves to Snowflake in two controlled steps instead of one. The in-and-out step swaps only the data source and keeps SSIS. Go-live then removes SSIS and makes the Snowflake tables the tier-1 tables. Each step is proven on its own and can be rolled back to the one before.</p>
+
+  <figure>
+    <div class="fig stage" id="stage" data-state="today">
+      <div class="switch-head">
+        <div class="toggle" role="group" aria-label="Migration state">
+          <button type="button" data-state="today" aria-pressed="true">1 · Today</button>
+          <button type="button" data-state="inout" aria-pressed="false">2 · In and out (cutover)</button>
+          <button type="button" data-state="golive" aria-pressed="false">3 · Go-live</button>
+        </div>
+        <p class="state" id="stState"><span class="dot" style="background:var(--legacy)"></span>Legacy procs feed tier-1</p>
+      </div>
+      <svg class="dg" viewBox="0 0 1100 600" style="min-width:880px" role="img" aria-labelledby="stTitle">
+        <title id="stTitle">Today SSIS loads tier-1 from the legacy procs on the CDM server. In and out repoints the CDM alias to thin procs that read SnowIn tables, and SSIS still loads tier-1. Go-live retires SSIS, moves the old tier-1 table to Legacy and makes the Snowflake table the tier-1 table, fed through land, gate and publish. Tier-2 reads the same table name in all three states.</title>
+
+        <rect class="zone" x="300" y="200" width="780" height="380" rx="10"/>
+        <text class="lab e" x="1064" y="566">LIQ server · LIQUIDITY db</text>
+
+        <!-- CDM -->
+        <g class="fade-ig">
+          <rect class="box legacy" x="20" y="60" width="190" height="90" rx="7"/>
+          <text class="t c" x="115" y="98">CDM server</text>
+          <text class="s c" x="115" y="120">legacy LIQ procs</text>
+        </g>
+        <text class="s c vis st-i st-g" x="115" y="172" style="fill:var(--legacy)">still fed, for rollback</text>
+
+        <!-- Snowflake -->
+        <rect class="box snow" x="20" y="440" width="180" height="90" rx="7"/>
+        <text class="t c" x="110" y="478">Snowflake tier-1</text>
+        <text class="s c" x="110" y="500">same sources</text>
+
+        <!-- SSIS and alias -->
+        <g class="fade-g">
+          <rect class="box" x="560" y="60" width="170" height="90" rx="7"/>
+          <text class="t c" x="645" y="98">SSIS packages</text>
+          <text class="s c" x="645" y="120">run by Control-M</text>
+          <path class="wire" d="M645,150 V246" marker-end="url(#ah-ink)"/>
+          <text class="s" x="655" y="186">LIQ alias</text>
+          <line class="wire" x1="560" y1="105" x2="480" y2="105"/>
+          <text class="lab c" x="520" y="92">CDM alias</text>
+        </g>
+        <path class="route legacy vis st-t" d="M470,105 H214"/>
+        <text class="lab vis st-t" x="300" y="92" style="fill:var(--legacy)">today</text>
+        <path class="route snow vis st-i" d="M470,105 V246"/>
+        <text class="lab vis st-i" x="482" y="186" style="fill:var(--snow)">in and out</text>
+        <g class="fade-g">
+          <line class="lever" x1="470" y1="105" x2="506" y2="105"/>
+          <circle class="hub" cx="470" cy="105" r="10"/>
+        </g>
+        <g class="vis st-g">
+          <line x1="574" y1="70" x2="716" y2="140" style="stroke:var(--bad)" stroke-width="3"/>
+          <line x1="716" y1="70" x2="574" y2="140" style="stroke:var(--bad)" stroke-width="3"/>
+          <text class="lab c f-bad" x="645" y="172">retired</text>
+        </g>
+
+        <!-- thin procs (in and out) -->
+        <g class="vis st-i">
+          <rect class="box snow" x="330" y="250" width="170" height="80" rx="7"/>
+          <text class="t c" x="415" y="284">LIQ procs</text>
+          <text class="s c" x="415" y="306">thin: read SnowIn_*</text>
+          <line class="wire" x1="415" y1="440" x2="415" y2="334" marker-end="url(#ah-ink)"/>
+        </g>
+        <!-- Legacy.X (go-live) -->
+        <g class="vis st-g">
+          <rect class="box legacy" x="330" y="250" width="170" height="80" rx="7" stroke-dasharray="6 4"/>
+          <text class="m c" x="415" y="284">Legacy.X</text>
+          <text class="s c" x="415" y="306">old tier-1, frozen</text>
+          <line class="wire muted dash" x1="580" y1="290" x2="504" y2="290" marker-end="url(#ah-muted)"/>
+        </g>
+
+        <!-- SnowIn (today, in and out) -->
+        <g class="vis st-t st-i">
+          <line class="wire" x1="200" y1="485" x2="326" y2="485" marker-end="url(#ah-ink)"/>
+          <text class="s c" x="263" y="472">DMNA (?)</text>
+          <rect class="box snow" x="330" y="440" width="170" height="90" rx="7"/>
+          <text class="m c" x="415" y="478">SnowIn_*.X</text>
+          <text class="s c" x="415" y="500">latest business date</text>
+        </g>
+        <g class="vis st-t">
+          <path class="wire muted dash" d="M500,485 H690 V334" marker-end="url(#ah-muted)"/>
+          <text class="s" x="560" y="474">compared only</text>
+        </g>
+
+        <!-- go-live feed -->
+        <g class="vis st-g">
+          <path class="route snow" d="M200,485 H516"/>
+          <polygon points="520,485 560,457 600,485 560,513" style="fill:var(--gate-soft);stroke:var(--gate)" stroke-width="2"/>
+          <text class="s c" x="560" y="490">gate</text>
+          <path class="route snow" d="M600,485 H690 V338"/>
+          <text class="s c" x="360" y="472">land → gate → publish</text>
+        </g>
+
+        <!-- tier-1 and downstream -->
+        <rect class="box t1" x="580" y="250" width="220" height="80" rx="7"/>
+        <text class="m c" x="690" y="284">Transactional.X</text>
+        <text class="s c vis st-t" x="690" y="306">tier-1, from legacy procs</text>
+        <text class="s c vis st-i" x="690" y="306">tier-1, from SnowIn via SSIS</text>
+        <text class="s c vis st-g" x="690" y="306">was SnowIn_*.X</text>
+
+        <line class="wire" x1="800" y1="290" x2="876" y2="290" marker-end="url(#ah-ink)"/>
+        <text class="s c" x="838" y="278">same name</text>
+        <rect class="box" x="880" y="250" width="170" height="80" rx="7"/>
+        <text class="t sm c" x="965" y="284">LIQ tier-2</text>
+        <text class="s c" x="965" y="306">Enrichment, modules</text>
+        <line class="wire" x1="965" y1="330" x2="965" y2="436" marker-end="url(#ah-ink)"/>
+        <rect class="box" x="880" y="440" width="170" height="90" rx="7"/>
+        <text class="t sm c" x="965" y="478">Liquidity reports</text>
+        <text class="s c" x="965" y="500">unchanged</text>
+      </svg>
+    </div>
+    <figcaption id="stCaption" aria-live="polite">Today the CDM alias points at the CDM server. SSIS runs the legacy procs and loads tier-1. Snowflake output lands in SnowIn_* and is only compared.</figcaption>
+  </figure>
+  <ul class="legend">
+    <li><i style="border-color:var(--legacy);background:var(--legacy-soft)"></i>Legacy SQL Server route</li>
+    <li><i style="border-color:var(--snow);background:var(--snow-soft)"></i>Snowflake route</li>
+    <li><i style="border-color:var(--gate);background:var(--gate-soft)"></i>Data gate</li>
+    <li>X stands for every Transactional, Reference and Config table</li>
+  </ul>
+</header>
+
+<section aria-labelledby="h-path">
+  <h2 id="h-path">The path, with a gate and a way back at every step</h2>
+  <p>Each move forward needs a go/no-go decision. Each state can roll back to the one before, and the in-and-out step keeps the first rollback down to an alias flip.</p>
+  <figure>
+    <div class="fig">
+      <svg class="dg" viewBox="0 0 1100 290" style="min-width:860px" role="img" aria-label="Today, gate 1, in and out, gate 2, go-live, gate 3, decommission. Rollback from in and out flips the alias back; rollback from go-live swaps the tables back and turns SSIS on.">
+        <rect class="box legacy" x="20" y="50" width="170" height="96" rx="8"/>
+        <text class="t c" x="105" y="80">1 · Today</text>
+        <text class="s c" x="105" y="104">legacy procs + SSIS</text>
+        <text class="s c" x="105" y="124">Snowflake compared</text>
+        <line class="wire" x1="190" y1="98" x2="216" y2="98" marker-end="url(#ah-ink)"/>
+        <polygon points="220,98 250,68 280,98 250,128" style="fill:var(--gate-soft);stroke:var(--gate)" stroke-width="2"/>
+        <text class="t sm c" x="250" y="103">G1</text>
+        <line class="wire" x1="280" y1="98" x2="296" y2="98" marker-end="url(#ah-ink)"/>
+
+        <rect class="box snow" x="300" y="50" width="190" height="96" rx="8"/>
+        <text class="t c" x="395" y="80">2 · In and out</text>
+        <text class="s c" x="395" y="104">alias → thin procs</text>
+        <text class="s c" x="395" y="124">SSIS still loads</text>
+        <line class="wire" x1="490" y1="98" x2="516" y2="98" marker-end="url(#ah-ink)"/>
+        <polygon points="520,98 550,68 580,98 550,128" style="fill:var(--gate-soft);stroke:var(--gate)" stroke-width="2"/>
+        <text class="t sm c" x="550" y="103">G2</text>
+        <line class="wire" x1="580" y1="98" x2="596" y2="98" marker-end="url(#ah-ink)"/>
+
+        <rect class="box t1" x="600" y="50" width="190" height="96" rx="8"/>
+        <text class="t c" x="695" y="80">3 · Go-live</text>
+        <text class="s c" x="695" y="104">tables swapped</text>
+        <text class="s c" x="695" y="124">SSIS retired</text>
+        <line class="wire" x1="790" y1="98" x2="816" y2="98" marker-end="url(#ah-ink)"/>
+        <polygon points="820,98 850,68 880,98 850,128" style="fill:var(--gate-soft);stroke:var(--gate)" stroke-width="2"/>
+        <text class="t sm c" x="850" y="103">G3</text>
+        <line class="wire" x1="880" y1="98" x2="896" y2="98" marker-end="url(#ah-ink)"/>
+
+        <rect class="box" x="900" y="50" width="180" height="96" rx="8"/>
+        <text class="t c" x="990" y="80">Decommission</text>
+        <text class="s c" x="990" y="104">legacy chain off</text>
+        <text class="s c" x="990" y="124">after clean period</text>
+
+        <path class="wire bad dash" d="M365,146 V196 H105 V150" marker-end="url(#ah-bad)"/>
+        <text class="s f-bad c" x="235" y="188">flip alias back, rerun live dates</text>
+        <path class="wire bad dash" d="M695,146 V246 H425 V150" marker-end="url(#ah-bad)"/>
+        <text class="s f-bad c" x="560" y="238">swap tables back, SSIS on, rerun live dates</text>
+        <text class="lab" x="20" y="278">Rollback paths</text>
+      </svg>
+    </div>
+    <figcaption>The in-and-out step proves Snowflake data in production while SSIS, the delete step and the tier-1 tables are all unchanged. Go-live then changes only the plumbing, on data that has already been proven.</figcaption>
+  </figure>
+</section>
+
+<section aria-labelledby="h-options">
+  <h2 id="h-options">Go-live strategies considered</h2>
+  <p>SteerCo asked for every strategy we could use. These are the realistic ones, rated by judgement against the criteria SteerCo cares about. Green is better for every column.</p>
+  <div class="tbl">
+    <table class="rate">
+      <thead><tr><th>Strategy</th><th>How it works</th><th>Go-live risk</th><th>Rollback</th><th>Confidence before go-live</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><th>Big bang</th><td>Rename the tables and retire SSIS in one step</td><td><span class="r hi">High</span></td><td><span class="r hi">Slow, reruns</span></td><td><span class="r hi">Low</span></td><td><span class="r lo">Low</span></td></tr>
+        <tr class="pick"><th>Staged: in and out, then go-live</th><td>Alias switch first, table swap once it's proven</td><td><span class="r lo">Low</span></td><td><span class="r lo">Alias flip</span></td><td><span class="r lo">High</span></td><td><span class="r md">Medium</span></td></tr>
+        <tr class="pick"><th>Blue/green tables</th><td>Both tables kept loaded, and a synonym chooses which one tier-2 reads</td><td><span class="r lo">Low</span></td><td><span class="r lo">Instant, no reruns</span></td><td><span class="r lo">High</span></td><td><span class="r hi">High</span></td></tr>
+        <tr><th>Publish, no rename</th><td>A T-SQL proc publishes SnowIn into the existing tables, with no SSIS</td><td><span class="r md">Medium</span></td><td><span class="r md">SSIS on, reruns</span></td><td><span class="r md">Medium</span></td><td><span class="r lo">Low</span></td></tr>
+        <tr><th>Phased by subject area</th><td>Deposits first, then Loans, then the rest, in dependency groups</td><td><span class="r md">Medium</span></td><td><span class="r md">Per area</span></td><td><span class="r md">Medium</span></td><td><span class="r hi">High</span></td></tr>
+        <tr><th>Pilot consumer</th><td>One tier-2 module reads Snowflake-fed copies first</td><td><span class="r md">Medium</span></td><td><span class="r lo">Fast</span></td><td><span class="r md">Medium</span></td><td><span class="r hi">High</span></td></tr>
+        <tr class="pre"><th>Shadow parallel run</th><td>Not a go-live itself. It's the evidence every option above needs first</td><td><span class="r lo">None</span></td><td>n/a</td><td><span class="r lo">Highest</span></td><td><span class="r md">Medium</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Phased by subject area carries a hidden risk: Deposits and Loans tables that join on surrogate keys could sit in two key spaces at once. If you phase, group tables by their join dependencies, not by business name.</p>
+</section>
+
+<section aria-labelledby="h-bg">
+  <h2 id="h-bg">Making go-live as safe as the cutover</h2>
+  <p>A plain rename makes go-live the riskiest step: rollback means reversing the rename and rerunning every live date. Blue/green keeps the legacy table loaded during hypercare, so rollback is one synonym change with nothing to rerun.</p>
+  <figure>
+    <div class="fig">
+      <svg class="dg" viewBox="0 0 1000 300" style="min-width:760px" role="img" aria-label="Tier-2 reads Transactional.X, a synonym. It points at Green.X, fed by Snowflake. Blue.X stays loaded by SSIS during hypercare as the rollback target.">
+        <rect class="box" x="20" y="110" width="170" height="80" rx="7"/>
+        <text class="t c" x="105" y="145">LIQ tier-2</text>
+        <text class="s c" x="105" y="167">reads the same name</text>
+        <line class="wire" x1="190" y1="150" x2="276" y2="150" marker-end="url(#ah-ink)"/>
+        <rect class="box gate" x="280" y="122" width="200" height="56" rx="28"/>
+        <text class="m c" x="380" y="147">Transactional.X</text>
+        <text class="s c" x="380" y="166">synonym</text>
+
+        <path class="route snow bgr" d="M480,150 H560 V80 H636"/>
+        <path class="wire muted dash" d="M480,150 H560 V220 H632" marker-end="url(#ah-muted)"/>
+        <text class="s" x="572" y="200">rollback: repoint</text>
+
+        <rect class="box snow" x="640" y="40" width="330" height="80" rx="7"/>
+        <text class="m" x="660" y="72">Green.X</text>
+        <text class="s" x="660" y="96">Snowflake: land → gate → publish. Live.</text>
+        <rect class="box legacy" x="640" y="180" width="330" height="80" rx="7"/>
+        <text class="m" x="660" y="212">Blue.X</text>
+        <text class="s" x="660" y="236">SSIS keeps loading it during hypercare</text>
+      </svg>
+    </div>
+    <figcaption>Costs to weigh: two loads run in the batch window during hypercare, and the SSIS destination has to point at Blue.X. A synonym also can't take TRUNCATE or ALTER, so check that no tier-2 job does either. After the clean period, drop Blue.X and retire SSIS.</figcaption>
+  </figure>
+</section>
+
+<section aria-labelledby="h-gates">
+  <h2 id="h-gates">What each gate needs</h2>
+  <p>These are what gives SteerCo the confidence. Agree them before the first rehearsal.</p>
+  <div class="gates">
+    <div><span class="gl">G1</span><h3>Enter in and out</h3><ul>
+      <li>Shadow run clean at all 4 levels, including a month-end</li>
+      <li>Catalog check passed, and the dedicated alias is in place</li>
+      <li>Key approach decided and tested across the cutover date</li>
+      <li>Alias flip and rollback rehearsed and timed</li>
+      <li>Data gate and Control-M changes live in pre-prod</li></ul></div>
+    <div><span class="gl">G2</span><h3>Enter go-live</h3><ul>
+      <li>In and out stable for an agreed run, including a month-end</li>
+      <li>Tier-1 history backfilled and reconciled</li>
+      <li>Grants, FKs, views and indexes inventoried and scripted</li>
+      <li>Publish proc and table swap rehearsed, both forward and back</li>
+      <li>Tier-2 confirmed safe on synonyms, if blue/green</li></ul></div>
+    <div><span class="gl">G3</span><h3>Decommission</h3><ul>
+      <li>Clean hypercare period agreed and met</li>
+      <li>Business sign-off on the liquidity reports</li>
+      <li>No open breaks above tolerance</li>
+      <li>Path marker shows Snowflake for every date</li>
+      <li>CDM consumers confirmed before legacy is switched off</li></ul></div>
+  </div>
+</section>
+
+<section aria-labelledby="h-status">
+  <h2 id="h-status">Confirmed and assumed</h2>
+  <div class="split">
+    <div class="col confirmed">
+      <h3><span class="pill ok">Confirmed</span>by you</h3>
+      <ul>
+        <li>Three states: today, in and out (the alias cutover), then go-live.</li>
+        <li>In and out: the alias points to thin LIQ procs that read SnowIn_*, and SSIS still loads tier-1.</li>
+        <li>Go-live: no SSIS, and SnowIn tables become the tier-1 tables tier-2 reads.</li>
+        <li>Tier-1 keeps history. Downstream is unchanged.</li>
+        <li>SteerCo wants every go-live strategy considered, with low risk as the goal.</li>
+      </ul>
+    </div>
+    <div class="col assumed">
+      <h3><span class="pill as">Assumed</span>for discussion</h3>
+      <ul>
+        <li>Blue/green is offered as a lower-risk way to do the go-live swap.</li>
+        <li>The go-live swap happens once, and daily loads then go through land, gate and publish.</li>
+        <li>The legacy CDM chain stays fed until G3.</li>
+        <li>The strategy ratings are judgement, to be checked with the team.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>LIQ migration go-live strategy. Replaces the separate cutover and go-live-by-rename pages for SteerCo use.</footer>
+</main>
+
+<script>
+(function(){
+  var fig = document.getElementById('stage');
+  var buttons = fig.querySelectorAll('.toggle button');
+  var st = document.getElementById('stState');
+  var cap = document.getElementById('stCaption');
+  var copy = {
+    today:{state:'Legacy procs feed tier-1', color:'var(--legacy)', caption:'Today the CDM alias points at the CDM server. SSIS runs the legacy procs and loads tier-1. Snowflake output lands in SnowIn_* and is only compared.'},
+    inout:{state:'Snowflake data in, SSIS out', color:'var(--snow)', caption:'In and out: the CDM alias points at the LIQ server. SSIS calls the thin procs, which read SnowIn_*, and loads tier-1 exactly as before. The legacy chain stays fed, so rollback is an alias flip.'},
+    golive:{state:'Snowflake tables are tier-1', color:'var(--gate)', caption:'Go-live: SSIS is retired, the old tier-1 table moves to Legacy.X, and the Snowflake table becomes Transactional.X, fed through land, gate and publish. Tier-2 reads the same name.'}
+  };
+  function set(s){
+    fig.setAttribute('data-state', s);
+    buttons.forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.state === s)); });
+    st.textContent = '';
+    var d = document.createElement('span'); d.className = 'dot'; d.style.background = copy[s].color;
+    st.appendChild(d); st.appendChild(document.createTextNode(copy[s].state));
+    cap.textContent = copy[s].caption;
+  }
+  buttons.forEach(function(b){ b.addEventListener('click', function(){ set(b.dataset.state); }); });
+})();
+</script>
+</html>
