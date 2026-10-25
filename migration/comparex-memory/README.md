@@ -35,5 +35,5 @@ guide, step-by-step prompts for Amp, tested reference code, templates, and the d
 ```bash
 cd reference
 pip install pyyaml pytest
-python -m pytest -q        # 12 tests
+python -m pytest -q        # 13 tests
 ```

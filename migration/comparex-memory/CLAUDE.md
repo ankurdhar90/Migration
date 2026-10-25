@@ -24,7 +24,7 @@ The enterprise app pulls it from GitHub and Amp executes the prompts.
    the repo and the exact migration folder name if not obvious). If the folder name differs,
    update every reference to `migration/comparex-memory` in this kit:
    `grep -rl "migration/comparex-memory" . | xargs sed -i 's#migration/comparex-memory#<new path>#g'`
-2. **Verify**: `cd reference && pip install pyyaml pytest && python -m pytest -q` (12 tests pass).
+2. **Verify**: `cd reference && pip install pyyaml pytest && python -m pytest -q` (13 tests pass).
 3. **Commit and push** on a new branch (e.g. `add-comparex-memory-kit`) and open a pull request,
    unless the user asks to push directly. Do not modify anything else in their repo.
 4. **Optional, only if the user asks** (keep everything inside this folder):
@@ -43,7 +43,7 @@ The enterprise app pulls it from GitHub and Amp executes the prompts.
 ## State at handoff
 - Done: design doc, implementation guide (with Phase 0 alignment and adapt-don't-rewrite rules),
   reference code (schema, type map, value patterns, hashing, entity name normalization,
-  Markdown extractor, scoring) with 12 passing tests, templates, prototype.
+  Markdown extractor, scoring) with 13 passing tests, templates, prototype.
 - Kit placed in the repo at `migration/comparex-memory/` and pushed to `main`.
 - Split into two phased versions (guide section 0.4): `v1-sqlite/` (prompts 00–08, SQLite
   only, Phase 6 is scheduled jobs) and `v2-sqlite-snowflake/` (version 1 plus a context prompt
