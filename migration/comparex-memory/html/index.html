@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Comparex Memory Explained</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  .keys { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .key { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+  .key .n { width: 26px; height: 26px; border-radius: 50%; background: var(--fg); color: var(--bg); font: 500 12px/26px var(--mono); text-align: center; }
+  .key p { color: var(--muted); font-size: 0.95rem; }
+  .tour { display: grid; gap: 10px; counter-reset: tour; }
+  .tour a { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: baseline; text-decoration: none; color: var(--fg); padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .tour a:hover { border-color: var(--mem); }
+  .tour b { font-family: var(--mono); font-weight: 500; color: var(--mem); }
+  .tour span { color: var(--muted); font-size: 0.95rem; display: block; }
+  .never li { padding-left: 4px; }
+  .never li::marker { content: "✕  "; color: var(--fail); }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">Comparex <span>Memory</span></a>
+  <nav class="nav" aria-label="Guide pages">
+    <a href="index.html" aria-current="page"><b>1</b>Overview</a>
+    <a href="journey.html"><b>2</b>Life of an issue</a>
+    <a href="signatures.html"><b>3</b>Signatures</a>
+    <a href="verify.html"><b>4</b>Verification</a>
+    <a href="confidence.html"><b>5</b>Confidence</a>
+    <a href="memory-file.html"><b>6</b>Memory file</a>
+    <a href="versions.html"><b>7</b>Versions</a>
+    <a href="roadmap.html"><b>8</b>Build phases</a>
+  </nav>
+</div></header>
+
+<main>
+  <div class="lede">
+    <span class="eyebrow">Start here</span>
+    <h1>Comparex keeps finding the same problems. Memory lets the agents remember how they were fixed.</h1>
+    <p>Today, every difference Comparex reports is triaged and fixed from scratch, even when the same kind of problem was solved last month on another table. The memory layer watches what the pipeline already produces and hands the agents a short history note for each new issue.</p>
+  </div>
+
+  <section aria-labelledby="pic">
+    <h2 id="pic">The whole system in one picture</h2>
+    <div class="figure">
+      <svg viewBox="0 0 1000 480" role="img" aria-labelledby="arch-t arch-d">
+        <title id="arch-t">Architecture of the memory layer</title>
+        <desc id="arch-d">The existing pipeline runs across the top unchanged. The memory sidecar below only reads its outputs, stores what it learns in SQLite, and writes a memory file per issue that the triage agent and Amp read as advice.</desc>
+        <defs>
+          <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-m"/></marker>
+          <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-a"/></marker>
+        </defs>
+
+        <rect x="12" y="18" width="976" height="122" rx="12" class="band"/>
+        <text x="28" y="40" class="t-band">EXISTING PIPELINE · UNCHANGED</text>
+        <rect x="12" y="222" width="976" height="246" rx="12" class="band"/>
+        <text x="28" y="244" class="t-band">MEMORY SIDECAR · NEW</text>
+
+        <!-- pipeline -->
+        <rect x="30" y="58" width="160" height="64" rx="8" class="box-pipe"/>
+        <text x="110" y="86" text-anchor="middle" class="t-strong">Comparex run</text>
+        <text x="110" y="104" text-anchor="middle" class="t-small muted">result file</text>
+        <rect x="225" y="58" width="160" height="64" rx="8" class="box-pipe"/>
+        <text x="305" y="86" text-anchor="middle" class="t-strong">Issue MD</text>
+        <text x="305" y="104" text-anchor="middle" class="t-small muted">ISSUE-123.md</text>
+        <rect x="420" y="58" width="160" height="64" rx="8" class="box-pipe"/>
+        <text x="500" y="86" text-anchor="middle" class="t-strong">Copilot triage</text>
+        <text x="500" y="104" text-anchor="middle" class="t-small muted">triage MD</text>
+        <rect x="615" y="58" width="160" height="64" rx="8" class="box-pipe"/>
+        <text x="695" y="86" text-anchor="middle" class="t-strong">Handoff MD</text>
+        <text x="695" y="104" text-anchor="middle" class="t-small muted">what to fix</text>
+        <rect x="810" y="58" width="160" height="64" rx="8" class="box-pipe"/>
+        <text x="890" y="86" text-anchor="middle" class="t-strong">Amp fix + commit</text>
+        <text x="890" y="104" text-anchor="middle" class="t-small muted">git history</text>
+        <path d="M190 90 H223" class="ln" marker-end="url(#am)"/>
+        <path d="M385 90 H418" class="ln" marker-end="url(#am)"/>
+        <path d="M580 90 H613" class="ln" marker-end="url(#am)"/>
+        <path d="M775 90 H808" class="ln" marker-end="url(#am)"/>
+
+        <!-- read-only taps -->
+        <path d="M110 122 V180 M305 122 V180 M490 122 V180 M695 122 V180 M870 122 V180 M110 180 H870" class="ln" stroke-dasharray="2 3"/>
+        <path d="M110 180 V262" class="ln" marker-end="url(#am)"/>
+        <rect x="150" y="168" width="96" height="22" rx="11" class="badge"/>
+        <text x="198" y="183" text-anchor="middle" class="badge-t">read-only</text>
+
+        <!-- memory row -->
+        <rect x="30" y="264" width="160" height="64" rx="8" class="box"/>
+        <text x="110" y="292" text-anchor="middle" class="t-strong">Ingester</text>
+        <text x="110" y="310" text-anchor="middle" class="t-small muted">reads new files</text>
+        <rect x="225" y="264" width="160" height="64" rx="8" class="box"/>
+        <text x="305" y="292" text-anchor="middle" class="t-strong">Signatures</text>
+        <text x="305" y="310" text-anchor="middle" class="t-small muted">fingerprint issues</text>
+        <rect x="420" y="264" width="160" height="64" rx="8" class="box"/>
+        <text x="500" y="292" text-anchor="middle" class="t-strong">Verifier</text>
+        <text x="500" y="310" text-anchor="middle" class="t-small muted">did the fix work?</text>
+        <rect x="615" y="264" width="160" height="64" rx="8" class="box"/>
+        <text x="695" y="292" text-anchor="middle" class="t-strong">Recall</text>
+        <text x="695" y="310" text-anchor="middle" class="t-small muted">rank past fixes</text>
+        <rect x="810" y="264" width="160" height="64" rx="8" class="box-mem"/>
+        <text x="890" y="292" text-anchor="middle" class="t-strong t-mem">Memory file</text>
+        <text x="890" y="310" text-anchor="middle" class="t-small muted">ISSUE-123.memory.md</text>
+        <path d="M190 296 H223" class="ln" marker-end="url(#am)"/>
+        <path d="M385 296 H418" class="ln" marker-end="url(#am)"/>
+        <path d="M580 296 H613" class="ln" marker-end="url(#am)"/>
+        <path d="M775 296 H808" class="ln" marker-end="url(#am)"/>
+
+        <!-- advisory -->
+        <path d="M910 264 V124" class="ln-mem" marker-end="url(#aa)"/>
+        <path d="M840 264 C 770 205, 600 200, 525 124" class="ln-mem" marker-end="url(#aa)"/>
+        <text x="920" y="205" class="t-small t-mem">advice</text>
+        <text x="640" y="206" class="t-small t-mem">advice</text>
+
+        <!-- storage -->
+        <path d="M305 328 V380 M500 328 V380 M695 328 V380" class="ln-db"/>
+        <path d="M305 380 H695" class="ln-db"/>
+        <ellipse cx="500" cy="392" rx="90" ry="12" class="db"/>
+        <path d="M410 392 V440 A90 12 0 0 0 590 440 V392" class="db"/>
+        <text x="500" y="424" text-anchor="middle" class="t-strong">SQLite</text>
+        <text x="500" y="442" text-anchor="middle" class="t-small muted mono">.memory/memory.db</text>
+
+        <ellipse cx="840" cy="392" rx="80" ry="12" class="db-sf"/>
+        <path d="M760 392 V440 A80 12 0 0 0 920 440 V392" class="db-sf"/>
+        <text x="840" y="424" text-anchor="middle" class="t-strong t-sf">Snowflake</text>
+        <text x="840" y="442" text-anchor="middle" class="t-small muted">version 2 only</text>
+        <path d="M594 416 H754" class="ln-sf" marker-start="url(#am)" marker-end="url(#am)"/>
+        <text x="674" y="408" text-anchor="middle" class="t-small t-sf">sync</text>
+      </svg>
+    </div>
+    <div class="keys">
+      <div class="key"><span class="n">1</span><div><h3>Nothing upstream changes</h3><p>The top row is how work happens today. Memory only reads its files and git history. If memory is switched off, the pipeline behaves exactly the same.</p></div></div>
+      <div class="key"><span class="n">2</span><div><h3>Memory learns by watching</h3><p>Each time new files appear, the ingester turns them into rows in a local SQLite database. Nobody has to write anything extra.</p></div></div>
+      <div class="key"><span class="n">3</span><div><h3>Comparex is the judge</h3><p>A fix only counts as working when the next Comparex run no longer shows the difference. What an agent claims in a handoff does not count.</p></div></div>
+      <div class="key"><span class="n">4</span><div><h3>Agents get a note, not orders</h3><p>For each issue, memory writes one Markdown file. Triage and Amp read it as advice; current Comparex results always win.</p></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="ideas">
+    <h2 id="ideas">Three ideas carry the whole design</h2>
+    <div class="cols">
+      <div class="card">
+        <span class="eyebrow">Matching</span>
+        <h3>Same problem means same structure</h3>
+        <p>Two issues are "the same" when Comparex describes them the same way: engine pair, kind of difference, type families, and the pattern in the values. Text search is only the last resort.</p>
+        <a href="signatures.html">Try the signature lab →</a>
+      </div>
+      <div class="card">
+        <span class="eyebrow">Trust</span>
+        <h3>Evidence, not opinions</h3>
+        <p>Every fix is checked against the next compare run and scored. Repeated wins turn a fix into a playbook; failures and caveats are remembered too.</p>
+        <a href="confidence.html">Play with the confidence score →</a>
+      </div>
+      <div class="card">
+        <span class="eyebrow">Safety</span>
+        <h3>Deterministic and model-free</h3>
+        <p>No LLM runs inside memory. It is Python and SQL: the same inputs always give the same database rows and the same memory file, byte for byte.</p>
+        <a href="memory-file.html">Read an annotated memory file →</a>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="never">
+    <h2 id="never">Rules it never breaks</h2>
+    <div class="prose">
+      <p>These come from the problem itself, so they hold in every phase and both versions. If a design choice breaks one of them, the choice is wrong.</p>
+      <ul class="never">
+        <li>It never edits an issue, triage or handoff file, an agent prompt, or Comparex itself.</li>
+        <li>It never writes outside its own folder, <code>.memory/</code> (plus the Snowflake memory schema in version 2). One guard function enforces this, and a test proves it.</li>
+        <li>It never stores real data values from the tables. Sample values are looked at once to name the pattern, then thrown away.</li>
+        <li>It never calls an LLM or a hosted model.</li>
+        <li>It never makes a claim without a source. Every recommendation cites an issue ID or commit.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section aria-labelledby="tour">
+    <h2 id="tour">Read the guide in this order</h2>
+    <div class="tour">
+      <a href="journey.html"><b>2</b><div>Life of an issue<span>Follow one problem from a compare run to the memory file, step by step.</span></div></a>
+      <a href="signatures.html"><b>3</b><div>Signatures<span>How an issue becomes a fingerprint, and what L1, L2 and L3 matches mean.</span></div></a>
+      <a href="verify.html"><b>4</b><div>Verification<span>How memory decides whether a fix passed, partly worked, failed or is still unknown.</span></div></a>
+      <a href="confidence.html"><b>5</b><div>Confidence and playbooks<span>How results turn into a trust score, and when a fix becomes a playbook.</span></div></a>
+      <a href="memory-file.html"><b>6</b><div>The memory file<span>The one file the agents actually read, line by line.</span></div></a>
+      <a href="versions.html"><b>7</b><div>Versions<span>SQLite only, or SQLite plus Snowflake. What changes and what does not.</span></div></a>
+      <a href="roadmap.html"><b>8</b><div>Build phases<span>What Amp builds in each phase, and what you review before saying go.</span></div></a>
+    </div>
+  </section>
+
+  <section aria-labelledby="words">
+    <h2 id="words">Words you will see</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Term</th><th>Plain meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Compare run</td><td>One time Comparex compared a source table with a target table, plus the list of differences it found.</td></tr>
+          <tr><td>Difference</td><td>One finding at column level, for example "values in <code>created_at</code> do not match on 1,200 rows".</td></tr>
+          <tr><td>Issue</td><td>One problem, written as an issue MD file with an ID like <code>ISSUE-123</code>.</td></tr>
+          <tr><td>Signature</td><td>A fingerprint of a difference, stored at three levels (L1, L2, L3) as short hashes.</td></tr>
+          <tr><td>Resolution</td><td>One attempt to fix an issue, usually one or more git commits plus the handoff file.</td></tr>
+          <tr><td>Outcome</td><td>What the next compare run said about that attempt: pass, partial, fail, or unverified.</td></tr>
+          <tr><td>Approach key</td><td>A short label for how something was fixed, like <code>config_change:datetime_precision</code>, so similar fixes group together.</td></tr>
+          <tr><td>Playbook</td><td>A fix that has passed often enough on the same kind of problem to be recommended.</td></tr>
+          <tr><td>Observation</td><td>A caveat attached to a fix: info, warning or blocker.</td></tr>
+          <tr><td>Memory file</td><td><code>.memory/ISSUE-123.memory.md</code>, the note the agents read.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="pager"><span></span><a href="journey.html">Next: Life of an issue →</a></div>
+</main>
+</body>
+</html>

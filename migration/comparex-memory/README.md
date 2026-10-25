@@ -20,6 +20,7 @@ guide, step-by-step prompts for Amp, tested reference code, templates, and the d
 | Path | What it is |
 | --- | --- |
 | `START_HERE.md` | Pick a version |
+| `html/` | Picture-based, interactive explainer pages. Open `html/index.html` in a browser; no internet or install needed |
 | `v1-sqlite/` | Version 1 run order (`START_HERE.md`) and prompts 00–08 |
 | `v2-sqlite-snowflake/` | Version 2 run order, its two extra prompts, and the Snowflake DDL |
 | `CLAUDE.md` | Context and tasks for Claude Code |

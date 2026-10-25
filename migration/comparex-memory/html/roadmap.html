@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Memory Build Phases</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  .lane { fill: var(--sunk); }
+  .lane-t { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; fill: var(--muted); }
+  .ph { cursor: pointer; }
+  .ph rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.4; transition: all 0.2s; }
+  .ph.v2 rect { stroke: var(--tgt); stroke-dasharray: 5 3; }
+  .ph.on rect { fill: var(--mem-soft); stroke: var(--mem); stroke-width: 2.6; stroke-dasharray: none; }
+  .ph:focus-visible rect { stroke: var(--focus); stroke-width: 3; }
+  .ph .k { font-family: var(--mono); font-weight: 500; font-size: 15px; }
+  .gate { fill: var(--fg); }
+  .gate-t { fill: var(--bg); font-size: 10px; font-family: var(--mono); }
+  .detail { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  @media (max-width: 860px) { .detail { grid-template-columns: 1fr; } }
+  .detail .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+  .detail ul { margin: 0; padding-left: 1.1em; display: grid; gap: 5px; }
+  .files { display: flex; flex-wrap: wrap; gap: 6px; }
+  .files code { font-size: 0.8rem; }
+  .who { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--panel); gap: 2px; }
+  .seg button { border: 0; border-radius: 999px; padding: 6px 14px; background: transparent; }
+  .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+  .hide-v2 .ph.v2, .hide-v2 .v2line { opacity: 0.15; pointer-events: none; }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">Comparex <span>Memory</span></a>
+  <nav class="nav" aria-label="Guide pages">
+    <a href="index.html"><b>1</b>Overview</a>
+    <a href="journey.html"><b>2</b>Life of an issue</a>
+    <a href="signatures.html"><b>3</b>Signatures</a>
+    <a href="verify.html"><b>4</b>Verification</a>
+    <a href="confidence.html"><b>5</b>Confidence</a>
+    <a href="memory-file.html"><b>6</b>Memory file</a>
+    <a href="versions.html"><b>7</b>Versions</a>
+    <a href="roadmap.html" aria-current="page"><b>8</b>Build phases</a>
+  </nav>
+</div></header>
+
+<main>
+  <div class="lede">
+    <span class="eyebrow">Guide 8 · Building it</span>
+    <h1>How Amp builds it, one phase at a time</h1>
+    <p>Amp, running inside the enterprise, does the real work by following one prompt per phase. You review the output of each phase before sending the next prompt. Nothing moves forward until the previous phase's tests pass.</p>
+  </div>
+
+  <section aria-labelledby="who-h">
+    <h2 id="who-h">Who does what</h2>
+    <div class="who">
+      <div class="card"><span class="eyebrow">You</span><h3>Pick, review, approve</h3><p>Choose the version, paste each prompt into Amp, read what it produced, and approve <code>ALIGNMENT.md</code> before any code. At the end, add one line to the agents' instructions.</p></div>
+      <div class="card"><span class="eyebrow">Amp</span><h3>Build against the real code</h3><p>Reads the real repo, reuses what already exists, writes the memory code and its tests, and reports. It proposes, but never makes, changes to existing code.</p></div>
+      <div class="card"><span class="eyebrow">This kit</span><h3>The map</h3><p>The guide, the prompts and tested reference code. It was written without seeing your code, so Amp adapts it instead of copying it.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="map-h">
+    <h2 id="map-h">The phases</h2>
+    <div class="row">
+      <div class="seg" role="group" aria-label="Show phases for">
+        <button type="button" id="f1" aria-pressed="false">Version 1</button>
+        <button type="button" id="f2" aria-pressed="true">Version 2</button>
+      </div>
+      <span class="caption">Click a phase to see what happens in it. ◆ marks a point where you must approve before going on.</span>
+    </div>
+    <div class="figure" id="mapfig">
+      <svg viewBox="0 0 1000 200" role="group" aria-label="Phases 0 to 8" id="map"></svg>
+    </div>
+    <div class="detail">
+      <div class="panel">
+        <span class="eyebrow" id="dTag"></span>
+        <h3 id="dTitle"></h3>
+        <p id="dWhy"></p>
+        <div><b>Amp builds</b><ul id="dBuild"></ul></div>
+        <div class="files" id="dFiles"></div>
+      </div>
+      <div class="panel">
+        <b>You check before the next phase</b>
+        <ul id="dCheck"></ul>
+        <b>Prompt to paste</b>
+        <pre class="block" id="dPrompt"></pre>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="guard-h">
+    <h2 id="guard-h">The safety test that grows every phase</h2>
+    <div class="figure narrow">
+      <svg viewBox="0 0 900 170" role="img" aria-label="The guard tree test hashes every file outside .memory before and after running memory commands, and fails if anything changed.">
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="head-m"/></marker></defs>
+        <rect x="20" y="50" width="200" height="70" rx="8" class="box"/>
+        <text x="120" y="80" text-anchor="middle" class="t-strong">Hash every file</text>
+        <text x="120" y="100" text-anchor="middle" class="t-small muted">outside .memory/</text>
+        <rect x="350" y="50" width="200" height="70" rx="8" class="box-mem"/>
+        <text x="450" y="80" text-anchor="middle" class="t-strong">Run memory</text>
+        <text x="450" y="100" text-anchor="middle" class="t-small muted mono">init → ingest → recall → eval</text>
+        <rect x="680" y="50" width="200" height="70" rx="8" class="box"/>
+        <text x="780" y="80" text-anchor="middle" class="t-strong">Hash again</text>
+        <text x="780" y="100" text-anchor="middle" class="t-small muted">must be identical</text>
+        <path d="M220 85 H348" class="ln" marker-end="url(#ar)"/>
+        <path d="M550 85 H678" class="ln" marker-end="url(#ar)"/>
+        <text x="450" y="150" text-anchor="middle" class="t-small muted">tests/test_guard_tree.py: proof that memory never touched the pipeline</text>
+      </svg>
+    </div>
+  </section>
+
+  <div class="pager"><a href="versions.html">← Versions</a><a href="index.html">Back to the overview</a></div>
+</main>
+
+<script>
+const P1 = "v1-sqlite/prompts/", P2 = "v2-sqlite-snowflake/prompts/";
+const PH = [
+  { k: "0", name: "Align", v: 1, gate: true, title: "Phase 0: study the code, write the plan",
+    why: "The guide was written without seeing your code. Before building, Amp maps every part of the design to existing code: reuse it, extend it, or add something new.",
+    build: ["No code at all", "docs/ALIGNMENT.md: current build, component map, layout, proposed changes, deviations, questions"],
+    files: ["docs/ALIGNMENT.md"], check: ["Every component has a reuse / extend / add decision", "Proposed changes to existing code: ideally none", "Approve it. Every later phase follows it."],
+    prompt: [P1 + "00_context.md", P1 + "00a_phase0_alignment.md"] },
+  { k: "1", name: "Base", v: 1, title: "Phase 1: foundations",
+    why: "Everything else needs config loading, the database and the write guard. The guard turns “we never touch the pipeline” into something a test can prove.",
+    build: ["Config loader that fails loudly on bad settings", "One write-guard function, the only code allowed to write files", "SQLite schema and helpers", "memctl init"],
+    files: ["config.py", "guard.py", "store/db.py", "store/schema.sql", "cli.py"], check: ["Tests green", "memctl init creates .memory/memory.db", "Guard test: nothing outside .memory/ changed"],
+    prompt: [P1 + "01_phase1_foundations.md"] },
+  { k: "2", name: "Signatures", v: 1, title: "Phase 2: signatures and entities",
+    why: "Pure functions with no file access: type parsing, value patterns and hashing. Reference code in the kit already passes the tests, so Amp adapts it.",
+    build: ["Type parser (DATETIME2(7) → datetime family)", "Value pattern rules", "L1 / L2 / L3 hashing", "Table and column entities with facts"],
+    files: ["signature/type_map.py", "signature/value_patterns.py", "signature/hashing.py", "signature/entities.py"], check: ["Golden hash test passes with the frozen values", "No sample values appear in signature fields"],
+    prompt: [P1 + "02_phase2_signatures.md"] },
+  { k: "3", name: "Ingest", v: 1, gate: true, title: "Phase 3: ingestion",
+    why: "Turns the pipeline's real files into rows. First Amp reads real examples and fits the config to them (3a), then builds the readers (3b–3d).",
+    build: ["Config fitted to the real file formats", "FORMAT_NOTES.md with anonymised examples", "Markdown, compare-result and git readers", "memctl ingest, --backfill, --watch"],
+    files: ["memory_config.yaml", "docs/FORMAT_NOTES.md", "ingest/*.py"], check: ["Config and FORMAT_NOTES.md look right (after 3a)", "At least 90% of real issue files parse", "Running ingest twice adds zero rows"],
+    prompt: [P1 + "03a_phase3a_config_fitting.md", P1 + "03b_phase3bd_ingestion.md"] },
+  { k: "4", name: "Outcomes", v: 1, title: "Phase 4: outcomes, confidence, playbooks",
+    why: "Makes memory trustworthy: fixes are judged by the next compare run, scored, and promoted to playbooks.",
+    build: ["Verifier (pass / partial / fail / unverified / pending, reopen)", "Confidence scoring", "Playbook status rules"],
+    files: ["outcomes/verifier.py", "outcomes/scoring.py", "outcomes/playbooks.py"], check: ["Every resolved issue in the backfill has an outcome", "Counts of outcomes and playbooks look plausible"],
+    prompt: [P1 + "04_phase4_outcomes.md"] },
+  { k: "5", name: "Recall", v: 1, title: "Phase 5: recall, memory file, CLI",
+    why: "Everything so far is invisible to agents. This phase writes the memory file they read, plus the memctl commands.",
+    build: ["Text index (TF-IDF + LSA) for the L4 fallback", "Candidate search and ranking", "Memory file writer", "The rest of memctl"],
+    files: ["recall/*.py", "cli.py"], check: ["Three real memory files make sense to you", "Golden memory-file test passes"],
+    prompt: [P1 + "05_phase5_recall.md"] },
+  { k: "6", name: "Jobs", v: 1, title: "Phase 6: scheduled jobs",
+    why: "Some memory changes with time alone: waiting fixes expire, confidence decays, facts go stale.",
+    build: ["Nightly: rebuild text index, rescore", "Daily: expire unverified, report", "Weekly: decay old facts", "memctl jobs run <name>"],
+    files: ["jobs.py"], check: ["Job tests pass with a fixed date", "Scheduler entries proposed for your existing scheduler"],
+    prompt: [P1 + "06_phase6_jobs.md"] },
+  { k: "7", name: "Eval", v: 1, gate: true, title: "Phase 7: evaluation",
+    why: "Proof that memory helps. It replays history: for each past issue, what would memory have recommended on that day, using only what was known then?",
+    build: ["Replay evaluation with no peeking at the future", "memctl eval and an eval report"],
+    files: ["evaluation.py", ".memory/eval_report.md"], check: ["Review the report with the team", "It becomes the baseline (target: right first answer 70% of the time on recurring problems)", "Then a human adds the agent instruction line"],
+    prompt: [P1 + "07_phase7_evaluation.md", P1 + "08_agent_instruction_line.md"] },
+  { k: "8", name: "Snowflake", v: 2, gate: true, title: "Phase 8 (version 2): Snowflake sync",
+    why: "Adds Snowflake as the shared, long-term copy. First Amp documents credentials, schemas and roles for you to approve, then builds push and pull.",
+    build: ["Version 2 section in ALIGNMENT.md", "Push (stage table + MERGE) and pull", "snowflake.enabled switch", "memctl sync push | pull"],
+    files: ["store/snowflake_sync.py", "snowflake/ddl.sql"], check: ["Approve the version 2 section before code", "All version 1 tests still pass with sync off", "Round trip on a test schema gives identical memory files", "Credentials never appear in logs"],
+    prompt: [P2 + "00_snowflake_context.md", P2 + "01_phase8_snowflake_sync.md"] },
+];
+const map = document.getElementById("map");
+const x = i => 20 + i * 108;
+map.innerHTML = `<rect class="lane" x="10" y="14" width="${x(8) - 18}" height="22" rx="4"></rect><text class="lane-t" x="20" y="29">VERSION 1 · SQLITE</text>
+  <rect class="lane v2line" x="${x(8) - 4}" y="14" width="114" height="22" rx="4"></rect><text class="lane-t v2line" x="${x(8) + 6}" y="29">VERSION 2</text>` +
+  PH.map((p, i) => `<g class="ph${p.v === 2 ? " v2" : ""}" data-i="${i}" tabindex="0" role="button" aria-label="${p.title}">
+    <rect x="${x(i)}" y="56" width="96" height="78" rx="9"></rect>
+    <text class="k" x="${x(i) + 48}" y="88" text-anchor="middle">${p.k}</text>
+    <text x="${x(i) + 48}" y="110" text-anchor="middle" class="t-small">${p.name}</text>
+    ${p.gate ? `<g><rect class="gate" x="${x(i) + 22}" y="146" width="52" height="20" rx="10"></rect><text class="gate-t" x="${x(i) + 48}" y="160" text-anchor="middle">◆ approve</text></g>` : ""}
+  </g>`).join("");
+const $ = id => document.getElementById(id);
+let cur = 0;
+function show(i) {
+  cur = i; const p = PH[i];
+  map.querySelectorAll(".ph").forEach(g => g.classList.toggle("on", +g.dataset.i === i));
+  $("dTag").textContent = p.v === 2 ? "Version 2 only" : "Both versions";
+  $("dTitle").textContent = p.title;
+  $("dWhy").textContent = p.why;
+  $("dBuild").innerHTML = p.build.map(b => `<li>${b.replace(/</g, "&lt;")}</li>`).join("");
+  $("dFiles").innerHTML = p.files.map(f => `<code>${f}</code>`).join("");
+  $("dCheck").innerHTML = p.check.map(c => `<li>${c}</li>`).join("");
+  $("dPrompt").textContent = p.prompt.map(f => "migration/comparex-memory/" + f).join("\n");
+}
+map.addEventListener("click", e => { const g = e.target.closest(".ph"); if (g) show(+g.dataset.i); });
+map.addEventListener("keydown", e => { const g = e.target.closest(".ph"); if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); show(+g.dataset.i); } });
+function setV(n) {
+  $("mapfig").classList.toggle("hide-v2", n === 1);
+  $("f1").setAttribute("aria-pressed", String(n === 1)); $("f2").setAttribute("aria-pressed", String(n === 2));
+  if (n === 1 && cur === 8) show(7);
+}
+$("f1").onclick = () => setV(1); $("f2").onclick = () => setV(2);
+show(0);
+</script>
+</body>
+</html>

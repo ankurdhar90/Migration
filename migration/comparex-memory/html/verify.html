@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Fix Verification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  .tree .q rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.4; }
+  .tree .r rect { stroke-width: 1.6; }
+  .tree .r.pass rect { fill: var(--pass-soft); stroke: var(--pass); }
+  .tree .r.fail rect { fill: var(--fail-soft); stroke: var(--fail); }
+  .tree .r.partial rect { fill: var(--mem-soft); stroke: var(--partial); }
+  .tree .r.unv rect, .tree .r.pend rect { fill: var(--sunk); stroke: var(--muted); stroke-dasharray: 4 3; }
+  .tree .edge path { stroke: var(--line); stroke-width: 2; fill: none; transition: stroke 0.25s; }
+  .tree .edge text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+  .tree .edge.on path { stroke: var(--mem); stroke-width: 3; }
+  .tree .edge.on text { fill: var(--mem); font-weight: 600; }
+  .tree .n { transition: opacity 0.25s; }
+  .tree.dim .n:not(.on) { opacity: 0.35; }
+  .tree .q.on rect { stroke: var(--mem); stroke-width: 2.4; }
+  .tree .r.on rect { stroke-width: 3; }
+  .play { display: grid; gap: 18px; }
+  .controls { display: grid; gap: 14px 24px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .controls fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .controls legend { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; }
+  .controls .opt { display: flex; gap: 8px; align-items: center; color: var(--fg); font-size: 0.93rem; }
+  .controls input[type=range] { width: 100%; padding: 0; }
+  .controls .val { font-family: var(--mono); font-size: var(--step--1); color: var(--muted); }
+  .result { display: grid; gap: 8px; }
+  .result .big { font-family: var(--display); font-size: var(--step-2); font-weight: 700; }
+  .tl .axis { stroke: var(--muted); stroke-width: 1.6; }
+  .tl .win { fill: var(--mem-soft); stroke: var(--mem); stroke-dasharray: 4 3; }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">Comparex <span>Memory</span></a>
+  <nav class="nav" aria-label="Guide pages">
+    <a href="index.html"><b>1</b>Overview</a>
+    <a href="journey.html"><b>2</b>Life of an issue</a>
+    <a href="signatures.html"><b>3</b>Signatures</a>
+    <a href="verify.html" aria-current="page"><b>4</b>Verification</a>
+    <a href="confidence.html"><b>5</b>Confidence</a>
+    <a href="memory-file.html"><b>6</b>Memory file</a>
+    <a href="versions.html"><b>7</b>Versions</a>
+    <a href="roadmap.html"><b>8</b>Build phases</a>
+  </nav>
+</div></header>
+
+<main>
+  <div class="lede">
+    <span class="eyebrow">Guide 4 · Ground truth</span>
+    <h1>Did the fix work? Only Comparex gets to say.</h1>
+    <p>A handoff file can claim anything. So memory ignores claims and waits for the next compare run on the same tables. If the issue's exact fingerprint (its L1 signature) is gone, the fix passed.</p>
+  </div>
+
+  <section aria-labelledby="tree-h">
+    <h2 id="tree-h">The decision, as a flowchart</h2>
+    <div class="prose"><p>Set up a situation on the left. The path memory takes lights up, and the result is what gets saved in the <code>outcomes</code> table.</p></div>
+    <div class="play">
+      <form class="controls" id="ctl" onsubmit="return false">
+        <fieldset>
+          <legend>The issue</legend>
+          <label class="opt" for="hasL1"><input type="checkbox" id="hasL1" checked> Has a structural (L1) signature</label>
+          <label class="opt" for="acc"><input type="checkbox" id="acc"> Handoff marks it an accepted difference</label>
+        </fieldset>
+        <fieldset>
+          <legend>After the fix</legend>
+          <label class="opt" for="run1"><input type="radio" name="run" id="run1" value="yes" checked> A compare run on these tables happened</label>
+          <label class="opt" for="run0"><input type="radio" name="run" id="run0" value="no"> No compare run yet</label>
+        </fieldset>
+        <fieldset id="daysBox">
+          <legend>Days since the fix</legend>
+          <input type="range" id="days" min="0" max="30" value="5" aria-describedby="daysVal">
+          <span class="val" id="daysVal"></span>
+        </fieldset>
+        <fieldset id="rowsBox">
+          <legend>Rows still different in that run</legend>
+          <input type="range" id="rows" min="0" max="1500" step="50" value="0" aria-describedby="rowsVal">
+          <span class="val" id="rowsVal"></span>
+        </fieldset>
+      </form>
+      <div class="figure" style="display:grid;gap:14px">
+        <svg class="tree dim" id="tree" viewBox="0 0 1000 620" role="img" aria-label="Verification flowchart"></svg>
+        <div class="result" aria-live="polite">
+          <span class="big" id="resBig"></span>
+          <p id="resText"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="win-h">
+    <h2 id="win-h">The waiting window</h2>
+    <div class="figure narrow">
+      <svg class="tl" viewBox="0 0 900 150" role="img" aria-label="A fix waits up to 14 days for a compare run. A run inside the window decides the outcome; with no run after 14 days the fix is unverified.">
+        <rect x="80" y="40" width="420" height="50" rx="6" class="win"/>
+        <line x1="40" y1="65" x2="860" y2="65" class="axis"/>
+        <circle cx="80" cy="65" r="7" style="fill:var(--fg)"/>
+        <text x="80" y="25" text-anchor="middle" class="t-small">fix committed</text>
+        <text x="290" y="58" text-anchor="middle" class="t-small t-mem">14-day window: result is “pending” meanwhile</text>
+        <circle cx="300" cy="65" r="7" style="fill:var(--pass)"/>
+        <text x="300" y="112" text-anchor="middle" class="t-small">first run after the fix</text>
+        <text x="300" y="128" text-anchor="middle" class="t-small muted">decides pass / partial / fail</text>
+        <line x1="500" y1="30" x2="500" y2="100" style="stroke:var(--fail);stroke-width:2;stroke-dasharray:3 3"/>
+        <text x="500" y="22" text-anchor="middle" class="t-small t-fail">day 14</text>
+        <text x="690" y="58" text-anchor="middle" class="t-small muted">no run by now → “unverified”</text>
+        <text x="80" y="112" text-anchor="middle" class="t-small muted mono">day 0</text>
+      </svg>
+    </div>
+  </section>
+
+  <section aria-labelledby="re-h">
+    <h2 id="re-h">A pass can still be taken back</h2>
+    <div class="figure narrow">
+      <svg viewBox="0 0 900 190" role="img" aria-label="If the same L1 problem comes back as a new issue within 30 days of a pass, the old pass is marked reopened and counts as a fail.">
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="head-m"/></marker></defs>
+        <line x1="40" y1="90" x2="860" y2="90" class="ln"/>
+        <rect x="70" y="60" width="200" height="60" rx="8" style="fill:var(--pass-soft);stroke:var(--pass)"/>
+        <text x="170" y="86" text-anchor="middle" class="t-strong">ISSUE-123 passes</text>
+        <text x="170" y="104" text-anchor="middle" class="t-small muted">day 0</text>
+        <rect x="430" y="60" width="200" height="60" rx="8" class="box"/>
+        <text x="530" y="86" text-anchor="middle" class="t-strong">ISSUE-150 opens</text>
+        <text x="530" y="104" text-anchor="middle" class="t-small muted">day 12 · same L1</text>
+        <path d="M430 132 C 360 175, 260 175, 190 128" class="ln" style="stroke:var(--fail)" marker-end="url(#ar)"/>
+        <text x="310" y="182" text-anchor="middle" class="t-small t-fail">ISSUE-123's pass becomes “reopened”, scored as a fail</text>
+        <text x="745" y="86" text-anchor="middle" class="t-small muted">after day 30, a repeat</text>
+        <text x="745" y="104" text-anchor="middle" class="t-small muted">is just a new issue</text>
+      </svg>
+    </div>
+    <div class="prose"><p>If the exact same problem shows up again within 30 days of a pass, the fix did not really hold. Memory marks the old outcome <code>reopened</code>, sets that issue's status back to reopened, and scores it as a fail from then on.</p></div>
+  </section>
+
+  <div class="pager"><a href="signatures.html">← Signatures</a><a href="confidence.html">Next: Confidence →</a></div>
+</main>
+
+<script>
+const BEFORE = 1200, WINDOW = 14;
+const N = {
+  start: { x: 500, y: 36, w: 220, h: 40, k: "q", t: ["A fix was committed"] },
+  q1: { x: 500, y: 116, w: 250, h: 52, k: "q", t: ["Does the issue have", "an L1 signature?"] },
+  unvA: { x: 150, y: 116, w: 170, h: 52, k: "r unv", t: ["unverified", "can't check structurally"] },
+  q2: { x: 500, y: 206, w: 250, h: 52, k: "q", t: ["Marked as an accepted", "difference?"] },
+  passA: { x: 150, y: 206, w: 170, h: 52, k: "r pass", t: ["pass", "difference is expected"] },
+  q3: { x: 500, y: 296, w: 250, h: 52, k: "q", t: ["A compare run on these", "tables after the fix?"] },
+  q4: { x: 820, y: 296, w: 220, h: 52, k: "q", t: ["More than 14 days", "since the fix?"] },
+  unvB: { x: 725, y: 396, w: 150, h: 52, k: "r unv", t: ["unverified", "no evidence came"] },
+  pend: { x: 905, y: 396, w: 150, h: 52, k: "r pend", t: ["pending", "check next cycle"] },
+  q5: { x: 500, y: 396, w: 250, h: 52, k: "q", t: ["Is the issue's L1 still", "in that run?"] },
+  passB: { x: 150, y: 396, w: 170, h: 52, k: "r pass", t: ["pass", "difference is gone"] },
+  q6: { x: 500, y: 496, w: 250, h: 52, k: "q", t: ["Fewer rows than before,", "but more than zero?"] },
+  partial: { x: 350, y: 586, w: 170, h: 52, k: "r partial", t: ["partial", "better, not fixed"] },
+  fail: { x: 650, y: 586, w: 170, h: 52, k: "r fail", t: ["fail", "same or worse"] },
+};
+const E = [
+  ["start", "q1", "", "M500 56 V90"],
+  ["q1", "unvA", "no", "M375 116 H235"],
+  ["q1", "q2", "yes", "M500 142 V180"],
+  ["q2", "passA", "yes", "M375 206 H235"],
+  ["q2", "q3", "no", "M500 232 V270"],
+  ["q3", "q4", "no", "M625 296 H710"],
+  ["q3", "q5", "yes", "M500 322 V370"],
+  ["q4", "unvB", "yes", "M790 322 L740 370"],
+  ["q4", "pend", "no", "M850 322 L895 370"],
+  ["q5", "passB", "no", "M375 396 H235"],
+  ["q5", "q6", "yes", "M500 422 V470"],
+  ["q6", "partial", "yes", "M450 522 L380 560"],
+  ["q6", "fail", "no", "M550 522 L620 560"],
+];
+const labelPos = d => { const n = d.match(/-?\d+(\.\d+)?/g).map(Number); return [(n[0] + n[n.length - 2]) / 2 + 8, (n[1] + n[n.length - 1]) / 2 - 4]; };
+const tree = document.getElementById("tree");
+tree.innerHTML = E.map(([a, b, l, d]) => { const [lx, ly] = labelPos(d); return `<g class="edge" data-e="${a}-${b}"><path d="${d}"></path>${l ? `<text x="${lx}" y="${ly}">${l}</text>` : ""}</g>`; }).join("") +
+  Object.entries(N).map(([id, n]) => `<g class="n ${n.k}" data-n="${id}">
+    <rect x="${n.x - n.w / 2}" y="${n.y - n.h / 2}" width="${n.w}" height="${n.h}" rx="${n.k.startsWith("r") ? 26 : 8}"></rect>
+    ${n.t.map((line, i) => `<text x="${n.x}" y="${n.y + (n.t.length === 1 ? 5 : i ? 15 : -3)}" text-anchor="middle" class="${i ? "t-small muted" : "t-strong"}">${line}</text>`).join("")}</g>`).join("");
+
+const $ = id => document.getElementById(id);
+const TEXT = {
+  unvA: ["unverified", "chip muted", "Without an L1 fingerprint there is nothing to look for in the next run, so the fix can never be proven. It is kept, but it does not count toward confidence."],
+  passA: ["pass", "chip pass", "Some differences are expected (for example a known rounding rule). Once triage or the handoff marks it accepted, the outcome is pass, and the remaining row count is still recorded."],
+  unvB: ["unverified", "chip muted", "No compare run on these tables arrived within 14 days. Memory stops waiting. Unverified outcomes are excluded from scoring, neither good nor bad."],
+  pend: ["pending", "chip muted", "Still inside the 14-day window. Memory checks again on the next ingest cycle."],
+  passB: ["pass", "chip pass", "The issue's exact fingerprint no longer appears in the next run. The issue becomes verified, and time-to-fix is measured from when it opened."],
+  partial: ["partial", "chip partial", "The difference is still there, but on fewer rows. It counts as half a success when scoring."],
+  fail: ["fail", "chip fail", "The difference is still there on as many rows or more. The approach is remembered as having failed for this kind of problem."],
+};
+function path() {
+  const hasL1 = $("hasL1").checked, acc = $("acc").checked, run = document.querySelector("input[name=run]:checked").value === "yes";
+  const days = +$("days").value, rows = +$("rows").value;
+  const p = ["start", "q1"];
+  if (!hasL1) return [...p, "unvA"];
+  p.push("q2");
+  if (acc) return [...p, "passA"];
+  p.push("q3");
+  if (!run) return [...p, "q4", days > WINDOW ? "unvB" : "pend"];
+  p.push("q5");
+  if (rows === 0) return [...p, "passB"];
+  return [...p, "q6", rows < BEFORE ? "partial" : "fail"];
+}
+function update() {
+  const run = document.querySelector("input[name=run]:checked").value === "yes";
+  $("daysBox").hidden = run || !$("hasL1").checked || $("acc").checked;
+  $("rowsBox").hidden = !run || !$("hasL1").checked || $("acc").checked;
+  $("daysVal").textContent = `day ${$("days").value} (window is ${WINDOW} days)`;
+  $("rowsVal").textContent = `${(+$("rows").value).toLocaleString()} rows (was ${BEFORE.toLocaleString()} before the fix)`;
+  const p = path(), set = new Set(p), end = p[p.length - 1];
+  tree.querySelectorAll(".n").forEach(g => g.classList.toggle("on", set.has(g.dataset.n)));
+  tree.querySelectorAll(".edge").forEach(g => { const [a, b] = g.dataset.e.split("-"); g.classList.toggle("on", set.has(a) && set.has(b) && p.indexOf(b) === p.indexOf(a) + 1); });
+  const [word, cls, txt] = TEXT[end];
+  $("resBig").innerHTML = `Outcome: <span class="${cls}" style="font-size:1rem;vertical-align:middle">${word}</span>`;
+  $("resText").textContent = txt;
+}
+$("ctl").addEventListener("input", update);
+update();
+</script>
+</body>
+</html>

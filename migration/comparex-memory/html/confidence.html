@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Confidence and Playbooks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  .bench { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+  @media (max-width: 900px) { .bench { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+  .panel > * { min-width: 0; }
+  .orow { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+  .orow .idx { font-family: var(--mono); font-size: var(--step--1); color: var(--muted); }
+  .orow select, .orow input[type=number] { width: 100%; min-width: 0; }
+  .orow .re { display: flex; gap: 4px; align-items: center; font-size: var(--step--1); color: var(--muted); white-space: nowrap; }
+  .orow button { padding: 4px 9px; }
+  .score { display: grid; gap: 6px; }
+  .score .num { font-family: var(--display); font-size: 3rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .gauge .track { fill: var(--sunk); }
+  .gauge .fillbar { fill: var(--mem); transition: width 0.3s; }
+  .gauge .tick { stroke: var(--fg); stroke-width: 1.5; }
+  .chart .grid { stroke: var(--line); stroke-width: 1; }
+  .chart .curve { stroke: var(--muted); stroke-width: 2; fill: none; }
+  .chart .area { fill: var(--sunk); }
+  .chart text { font-size: 11px; fill: var(--muted); font-family: var(--mono); }
+  .dot-pass { fill: var(--pass); } .dot-fail { fill: var(--fail); } .dot-partial { fill: var(--partial); }
+  .dot-off { fill: var(--panel); stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 2 2; }
+  .math { font-family: var(--mono); font-size: 0.85rem; overflow-x: auto; white-space: pre; background: var(--sunk); border-radius: 8px; padding: 10px 12px; line-height: 1.6; }
+  .rules { display: grid; gap: 8px; counter-reset: r; margin: 0; padding: 0; list-style: none; }
+  .rules li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); transition: all 0.2s; }
+  .rules li::before { counter-increment: r; content: counter(r); font: 500 12px/24px var(--mono); width: 24px; height: 24px; border-radius: 50%; background: var(--sunk); text-align: center; }
+  .rules li.hit { border-color: var(--mem); background: var(--mem-soft); }
+  .rules li.hit::before { background: var(--mem); color: var(--bg); }
+  .rules li.skip { opacity: 0.55; }
+  .rules .state { font-family: var(--mono); font-size: var(--step--1); color: var(--muted); }
+  .life .st rect { stroke-width: 1.8; }
+  .life .st.on rect { stroke-width: 3.2; }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">Comparex <span>Memory</span></a>
+  <nav class="nav" aria-label="Guide pages">
+    <a href="index.html"><b>1</b>Overview</a>
+    <a href="journey.html"><b>2</b>Life of an issue</a>
+    <a href="signatures.html"><b>3</b>Signatures</a>
+    <a href="verify.html"><b>4</b>Verification</a>
+    <a href="confidence.html" aria-current="page"><b>5</b>Confidence</a>
+    <a href="memory-file.html"><b>6</b>Memory file</a>
+    <a href="versions.html"><b>7</b>Versions</a>
+    <a href="roadmap.html"><b>8</b>Build phases</a>
+  </nav>
+</div></header>
+
+<main>
+  <div class="lede">
+    <span class="eyebrow">Guide 5 · Trust</span>
+    <h1>How a few results become a trust score</h1>
+    <p>Every approach, on every kind of problem (one L2 signature), gets a confidence between 0 and 1. It goes up with verified passes, down with failures, and older results slowly count for less. Build a history below and watch it move.</p>
+  </div>
+
+  <section aria-labelledby="bench-h">
+    <h2 id="bench-h">The confidence bench</h2>
+    <div class="row" role="group" aria-label="Example histories">
+      <button type="button" data-p="lucky">One lucky pass</button>
+      <button type="button" data-p="proven">Proven fix</button>
+      <button type="button" data-p="stale">Old wins, recent fail</button>
+      <button type="button" data-p="mixed">Mixed results</button>
+    </div>
+    <div class="bench">
+      <div class="panel">
+        <h3>Outcomes for <code>config_change:datetime_precision</code></h3>
+        <p class="caption">Each row is one fix on a different issue, with the same L2 signature. Age is days since Comparex verified it.</p>
+        <div id="rows" style="display:grid;gap:8px"></div>
+        <div class="row"><button type="button" id="add">+ Add outcome</button></div>
+        <svg class="chart" id="chart" viewBox="0 0 520 220" role="img" aria-label="How much an outcome counts by its age"></svg>
+        <p class="caption">The curve is the weight of one outcome by age. It halves every 180 days. Dots are your outcomes; hollow dots are excluded from scoring.</p>
+      </div>
+      <div class="panel">
+        <div class="score">
+          <span class="eyebrow">Confidence</span>
+          <span class="num" id="conf" aria-live="polite">0.50</span>
+          <svg class="gauge" viewBox="0 0 400 54" role="img" aria-label="Confidence gauge with retire threshold at 0.4 and activate threshold at 0.7">
+            <rect class="track" x="0" y="8" width="400" height="16" rx="8"/>
+            <rect class="fillbar" id="gfill" x="0" y="8" width="200" height="16" rx="8"/>
+            <line class="tick" x1="160" y1="2" x2="160" y2="30"/><text x="160" y="46" text-anchor="middle" class="t-small t-fail">0.4 retire</text>
+            <line class="tick" x1="280" y1="2" x2="280" y2="30"/><text x="280" y="46" text-anchor="middle" class="t-small t-pass">0.7 activate</text>
+          </svg>
+        </div>
+        <div>
+          <span class="caption">The arithmetic</span>
+          <div class="math" id="math"></div>
+        </div>
+        <div class="note" style="font-size:0.93rem"><b>Why start at 0.5?</b> The formula begins with one imaginary pass and one imaginary fail. Without them a single lucky pass would show 100%. With them, one pass gives 0.67, two give 0.75, five give 0.86.</div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="pb-h">
+    <h2 id="pb-h">When does a fix become a playbook?</h2>
+    <div class="prose"><p>A playbook is a fix memory is willing to recommend as “proven”. Memory checks these rules from top to bottom, and the first one that applies decides the status. The bench above feeds them live.</p></div>
+    <div class="row">
+      <label class="opt" for="blocker" style="display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="blocker"> A [blocker] caveat exists on this approach</label>
+      <label class="opt" for="super" style="display:flex;gap:6px;align-items:center;color:var(--fg)"><input type="checkbox" id="super"> Another approach passed on the last 3 issues instead</label>
+    </div>
+    <ol class="rules" id="rules">
+      <li data-r="1"><span>A blocker caveat exists</span><span class="state">→ retired (blocker)</span></li>
+      <li data-r="2"><span>Confidence is below 0.4</span><span class="state">→ retired (low confidence)</span></li>
+      <li data-r="3"><span>A different approach won the last 3 issues while this one was not used</span><span class="state">→ retired (superseded)</span></li>
+      <li data-r="4"><span>At least 2 passes, from 2 different issues, and confidence at least 0.7</span><span class="state">→ active</span></li>
+      <li data-r="5"><span>None of the above</span><span class="state">→ candidate</span></li>
+    </ol>
+    <div class="figure narrow">
+      <svg class="life" viewBox="0 0 760 150" role="img" aria-label="Playbook lifecycle: candidate becomes active, either can be retired, and a retired playbook can return only after a new verified pass with no blocker.">
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="head-m"/></marker></defs>
+        <g class="st" data-s="candidate"><rect x="20" y="45" width="160" height="56" rx="28" style="fill:var(--sunk);stroke:var(--muted)"/><text x="100" y="78" text-anchor="middle" class="t-strong">candidate</text></g>
+        <g class="st" data-s="active"><rect x="300" y="45" width="160" height="56" rx="28" style="fill:var(--pass-soft);stroke:var(--pass)"/><text x="380" y="78" text-anchor="middle" class="t-strong">active</text></g>
+        <g class="st" data-s="retired"><rect x="580" y="45" width="160" height="56" rx="28" style="fill:var(--fail-soft);stroke:var(--fail)"/><text x="660" y="78" text-anchor="middle" class="t-strong">retired</text></g>
+        <path d="M180 66 H298" class="ln" marker-end="url(#ar)"/><text x="239" y="56" text-anchor="middle" class="t-small muted">enough passes</text>
+        <path d="M460 66 H578" class="ln" marker-end="url(#ar)"/><text x="519" y="56" text-anchor="middle" class="t-small muted">blocker / losses</text>
+        <path d="M660 101 C 640 150, 140 150, 110 103" class="ln" marker-end="url(#ar)"/><text x="380" y="140" text-anchor="middle" class="t-small muted">only after a new verified pass, with no blocker left</text>
+        <path d="M100 45 C 120 0, 640 0, 660 43" class="ln" stroke-dasharray="4 3" marker-end="url(#ar)"/><text x="380" y="18" text-anchor="middle" class="t-small muted">low confidence can retire a candidate too</text>
+      </svg>
+    </div>
+    <div class="note">Humans can edit a playbook's steps (<code>memctl playbook edit</code>). Once a person has edited them, memory never overwrites the steps again.</div>
+  </section>
+
+  <div class="pager"><a href="verify.html">← Verification</a><a href="memory-file.html">Next: Memory file →</a></div>
+</main>
+
+<script>
+// Port of reference/comparex_memory/outcomes/scoring.py, plus the status rules in guide 10.3.
+const HALF = 180, SCORE = { pass: 1, partial: 0.5, fail: 0 };
+const weight = age => Math.pow(0.5, age / HALF);
+function confidence(list) {
+  let num = 1, den = 2;
+  for (const o of list) {
+    if (!(o.result in SCORE)) continue;
+    const s = o.reopened ? 0 : SCORE[o.result], w = weight(o.age);
+    num += w * s; den += w;
+  }
+  return { value: Math.round((num / den) * 1e4) / 1e4, num, den };
+}
+const PRESETS = {
+  lucky: [{ result: "pass", reopened: false, age: 3 }],
+  proven: [0, 20, 45, 80, 120].map(a => ({ result: "pass", reopened: false, age: a })),
+  stale: [{ result: "pass", reopened: false, age: 400 }, { result: "pass", reopened: false, age: 380 }, { result: "pass", reopened: false, age: 350 }, { result: "fail", reopened: false, age: 10 }, { result: "fail", reopened: false, age: 4 }],
+  mixed: [{ result: "pass", reopened: false, age: 30 }, { result: "partial", reopened: false, age: 25 }, { result: "pass", reopened: true, age: 15 }, { result: "unverified", reopened: false, age: 5 }],
+};
+let data = PRESETS.proven.map(o => ({ ...o }));
+const $ = id => document.getElementById(id);
+function renderRows() {
+  $("rows").innerHTML = data.map((o, i) => `<div class="orow" data-i="${i}">
+    <span class="idx">${i + 1}</span>
+    <select id="r${i}" aria-label="Result of outcome ${i + 1}">${["pass","partial","fail","unverified","pending"].map(r => `<option${r === o.result ? " selected" : ""}>${r}</option>`).join("")}</select>
+    <input id="a${i}" type="number" min="0" max="1500" value="${o.age}" aria-label="Age in days of outcome ${i + 1}">
+    <label class="re" for="x${i}"><input type="checkbox" id="x${i}"${o.reopened ? " checked" : ""}${o.result === "pass" ? "" : " disabled"}> reopened</label>
+    <button type="button" aria-label="Remove outcome ${i + 1}" data-del="${i}">✕</button></div>`).join("");
+}
+function readRows() {
+  data = data.map((o, i) => ({ result: $(`r${i}`).value, age: Math.max(0, +$(`a${i}`).value || 0), reopened: $(`x${i}`).checked && $(`r${i}`).value === "pass" }));
+}
+function chart() {
+  const W = 520, H = 220, L = 40, R = 12, T = 12, B = 34, maxAge = 720;
+  const x = a => L + (Math.min(a, maxAge) / maxAge) * (W - L - R), y = w => T + (1 - w) * (H - T - B);
+  let pts = ""; for (let a = 0; a <= maxAge; a += 10) pts += `${x(a)},${y(weight(a))} `;
+  let s = [0, 0.25, 0.5, 0.75, 1].map(w => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(w)}" y2="${y(w)}"/><text x="${L - 6}" y="${y(w) + 4}" text-anchor="end">${w}</text>`).join("");
+  s += [0, 180, 360, 540, 720].map(a => `<text x="${x(a)}" y="${H - 14}" text-anchor="middle">${a}d</text>`).join("");
+  s += `<polygon class="area" points="${L},${y(0)} ${pts}${x(maxAge)},${y(0)}"/><polyline class="curve" points="${pts}"/>`;
+  s += data.map(o => { const cls = !(o.result in SCORE) ? "dot-off" : o.reopened || o.result === "fail" ? "dot-fail" : o.result === "partial" ? "dot-partial" : "dot-pass";
+    return `<circle class="${cls}" cx="${x(o.age)}" cy="${y(weight(o.age))}" r="6"><title>${o.result}${o.reopened ? " (reopened)" : ""}, ${o.age} days</title></circle>`; }).join("");
+  s += `<text x="${W - R}" y="${H - 2}" text-anchor="end">age of the outcome</text>`;
+  $("chart").innerHTML = s;
+}
+function status(conf) {
+  const passes = data.filter(o => o.result === "pass" && !o.reopened).length;
+  if ($("blocker").checked) return 1;
+  if (conf < 0.4) return 2;
+  if ($("super").checked) return 3;
+  if (passes >= 2 && conf >= 0.7) return 4;   // each row is a different issue here
+  return 5;
+}
+function update() {
+  readRows();
+  const c = confidence(data);
+  $("conf").textContent = c.value.toFixed(2);
+  $("gfill").setAttribute("width", Math.max(16, c.value * 400));
+  const lines = ["start              num = 1      den = 2"];
+  data.forEach((o, i) => {
+    if (!(o.result in SCORE)) { lines.push(`#${i + 1} ${o.result.padEnd(10)}  skipped (no evidence yet)`); return; }
+    const s = o.reopened ? 0 : SCORE[o.result], w = weight(o.age);
+    lines.push(`#${i + 1} ${(o.reopened ? "reopened" : o.result).padEnd(10)}  score ${s.toFixed(1)} × weight ${w.toFixed(3)} (${o.age}d)`);
+  });
+  lines.push(`total              num = ${c.num.toFixed(3)}  den = ${c.den.toFixed(3)}`);
+  lines.push(`confidence         ${c.num.toFixed(3)} / ${c.den.toFixed(3)} = ${c.value}`);
+  $("math").textContent = lines.join("\n");
+  chart();
+  const hit = status(c.value);
+  document.querySelectorAll("#rules li").forEach(li => { const r = +li.dataset.r; li.classList.toggle("hit", r === hit); li.classList.toggle("skip", r < hit); });
+  const st = hit <= 3 ? "retired" : hit === 4 ? "active" : "candidate";
+  document.querySelectorAll(".life .st").forEach(g => g.classList.toggle("on", g.dataset.s === st));
+}
+$("rows").addEventListener("change", () => { readRows(); renderRows(); update(); });
+$("rows").addEventListener("input", update);
+$("rows").addEventListener("click", e => { const d = e.target.closest("[data-del]"); if (!d) return; readRows(); data.splice(+d.dataset.del, 1); renderRows(); update(); });
+$("add").onclick = () => { readRows(); data.push({ result: "pass", reopened: false, age: 0 }); renderRows(); update(); };
+$("blocker").onchange = update; $("super").onchange = update;
+document.querySelectorAll("[data-p]").forEach(b => b.onclick = () => {
+  data = PRESETS[b.dataset.p].map(o => ({ ...o })); renderRows(); update();
+  document.querySelectorAll("[data-p]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+});
+document.querySelector('[data-p="proven"]').setAttribute("aria-pressed", "true");
+renderRows(); update();
+</script>
+</body>
+</html>

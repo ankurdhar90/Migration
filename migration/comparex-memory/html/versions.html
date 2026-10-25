@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Memory Versions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--panel); gap: 2px; }
+  .seg button { border: 0; border-radius: 999px; padding: 6px 14px; background: transparent; }
+  .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border: 0; }
+  .v2only { transition: opacity 0.35s; }
+  .is-v1 .v2only { opacity: 0.12; }
+  .v1only { transition: opacity 0.35s; opacity: 0; }
+  .is-v1 .v1only { opacity: 1; }
+  .machine { fill: none; stroke: var(--line); stroke-width: 1.4; stroke-dasharray: 3 4; }
+  .packet { fill: var(--mem); }
+  .packet.down { fill: var(--tgt); }
+  .lost { fill: var(--fail-soft); stroke: var(--fail); }
+  .cfg { font-family: var(--mono); font-size: 0.9rem; }
+  .cfg .on { color: var(--pass); font-weight: 600; } .cfg .off { color: var(--muted); font-weight: 600; }
+  .phase rect { stroke-width: 1.4; }
+  .phase.v1 rect { fill: var(--sunk); stroke: var(--line); }
+  .phase.v2 rect { fill: var(--panel); stroke: var(--tgt); stroke-dasharray: 5 3; }
+  td.yes { color: var(--pass); font-weight: 600; } td.no { color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">Comparex <span>Memory</span></a>
+  <nav class="nav" aria-label="Guide pages">
+    <a href="index.html"><b>1</b>Overview</a>
+    <a href="journey.html"><b>2</b>Life of an issue</a>
+    <a href="signatures.html"><b>3</b>Signatures</a>
+    <a href="verify.html"><b>4</b>Verification</a>
+    <a href="confidence.html"><b>5</b>Confidence</a>
+    <a href="memory-file.html"><b>6</b>Memory file</a>
+    <a href="versions.html" aria-current="page"><b>7</b>Versions</a>
+    <a href="roadmap.html"><b>8</b>Build phases</a>
+  </nav>
+</div></header>
+
+<main>
+  <div class="lede">
+    <span class="eyebrow">Guide 7 · Rollout</span>
+    <h1>Two versions, one after the other</h1>
+    <p>Version 1 keeps memory in a SQLite file on the machine that runs the pipeline. Version 2 adds Snowflake as a shared, long-term copy. Version 2 is version 1 plus one phase, so starting small costs nothing.</p>
+  </div>
+
+  <section aria-labelledby="pic-h">
+    <h2 id="pic-h">Where memory lives</h2>
+    <div class="row">
+      <div class="seg" role="group" aria-label="Choose a version">
+        <button type="button" id="b1" aria-pressed="false">Version 1 · SQLite</button>
+        <button type="button" id="b2" aria-pressed="true">Version 2 · SQLite + Snowflake</button>
+      </div>
+      <button type="button" id="cycle" class="primary">Run an ingest cycle</button>
+    </div>
+    <div class="figure" id="fig">
+      <svg viewBox="0 0 1000 380" role="img" aria-labelledby="vt" id="svg">
+        <title id="vt">Machine A runs the memory layer with a local SQLite file. In version 2 it pushes new rows to Snowflake after each cycle, and another machine pulls them at startup.</title>
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="head-m"/></marker></defs>
+
+        <rect x="20" y="30" width="370" height="320" rx="14" class="machine"/>
+        <text x="40" y="56" class="t-band">PIPELINE MACHINE A</text>
+        <rect x="50" y="76" width="150" height="54" rx="8" class="box-pipe"/>
+        <text x="125" y="100" text-anchor="middle" class="t-strong">Pipeline files</text>
+        <text x="125" y="118" text-anchor="middle" class="t-small muted">results, MD, git</text>
+        <rect x="230" y="76" width="140" height="54" rx="8" class="box"/>
+        <text x="300" y="100" text-anchor="middle" class="t-strong mono" style="font-size:13px">memctl ingest</text>
+        <text x="300" y="118" text-anchor="middle" class="t-small muted">every few minutes</text>
+        <path d="M200 103 H228" class="ln" marker-end="url(#ar)"/>
+        <ellipse cx="300" cy="190" rx="62" ry="10" class="db"/>
+        <path d="M238 190 V232 A62 10 0 0 0 362 232 V190" class="db"/>
+        <text x="300" y="218" text-anchor="middle" class="t-strong">SQLite</text>
+        <text x="300" y="234" text-anchor="middle" class="t-small muted mono">memory.db</text>
+        <path d="M300 130 V176" class="ln" marker-end="url(#ar)"/>
+        <rect x="50" y="270" width="170" height="54" rx="8" class="box-mem"/>
+        <text x="135" y="294" text-anchor="middle" class="t-strong t-mem">memory files</text>
+        <text x="135" y="312" text-anchor="middle" class="t-small muted">agents read these</text>
+        <path d="M262 236 C 240 270, 240 290, 222 296" class="ln" marker-end="url(#ar)"/>
+
+        <g class="v2only">
+          <ellipse cx="500" cy="170" rx="72" ry="12" class="db-sf"/>
+          <path d="M428 170 V222 A72 12 0 0 0 572 222 V170" class="db-sf"/>
+          <text x="500" y="202" text-anchor="middle" class="t-strong t-sf">Snowflake</text>
+          <text x="500" y="220" text-anchor="middle" class="t-small muted mono">COMPAREX_MEMORY</text>
+          <path id="pushPath" d="M362 205 C 390 205, 400 196, 426 196" class="ln-sf"/>
+          <text x="394" y="186" text-anchor="middle" class="t-small t-sf">push</text>
+          <text x="394" y="262" text-anchor="middle" class="t-small muted">after each cycle</text>
+          <path id="pullPath" d="M574 196 C 600 196, 610 205, 638 205" class="ln-sf"/>
+          <text x="606" y="186" text-anchor="middle" class="t-small t-sf">pull</text>
+          <text x="606" y="262" text-anchor="middle" class="t-small muted">at startup</text>
+
+          <rect x="610" y="30" width="370" height="320" rx="14" class="machine"/>
+          <text x="630" y="56" class="t-band">NEW MACHINE OR ANOTHER TEAM</text>
+          <ellipse cx="700" cy="190" rx="62" ry="10" class="db"/>
+          <path d="M638 190 V232 A62 10 0 0 0 762 232 V190" class="db"/>
+          <text x="700" y="218" text-anchor="middle" class="t-strong">SQLite</text>
+          <text x="700" y="234" text-anchor="middle" class="t-small muted mono">memory.db</text>
+          <rect x="790" y="170" width="170" height="54" rx="8" class="box-mem"/>
+          <text x="875" y="194" text-anchor="middle" class="t-strong t-mem">same history</text>
+          <text x="875" y="212" text-anchor="middle" class="t-small muted">from day one</text>
+          <path d="M762 205 H788" class="ln" marker-end="url(#ar)"/>
+        </g>
+        <g class="v1only">
+          <rect x="640" y="140" width="320" height="110" rx="12" class="lost"/>
+          <text x="800" y="180" text-anchor="middle" class="t-strong t-fail">No shared copy</text>
+          <text x="800" y="202" text-anchor="middle" class="t-small">If machine A is lost, its memory is lost.</text>
+          <text x="800" y="220" text-anchor="middle" class="t-small">Other machines start empty.</text>
+        </g>
+        <path id="ingestPath" d="M125 103 H300 V200" fill="none" stroke="none"/>
+        <circle id="pk1" r="7" class="packet" cx="-20" cy="-20"/>
+        <circle id="pk2" r="7" class="packet down" cx="-20" cy="-20"/>
+      </svg>
+    </div>
+    <p class="cfg" id="cfg"></p>
+  </section>
+
+  <section aria-labelledby="cmp-h">
+    <h2 id="cmp-h">Side by side</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>Version 1 · SQLite only</th><th>Version 2 · SQLite + Snowflake</th></tr></thead>
+        <tbody>
+          <tr><td>Phases to build</td><td>0 to 7</td><td>0 to 7, then 8</td></tr>
+          <tr><td>Where agents read memory</td><td>Local memory files</td><td>Local memory files (unchanged)</td></tr>
+          <tr><td>Survives losing the machine</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>Shared across machines and teams</td><td class="no">No</td><td class="yes">Yes</td></tr>
+          <tr><td>Needs Snowflake access and credentials</td><td class="yes">No</td><td class="no">Yes, test schema first</td></tr>
+          <tr><td>Extra dependency</td><td>None</td><td><code>snowflake-connector-python</code>, or the repo's own connection module</td></tr>
+          <tr><td>The switch in config</td><td><code>snowflake.enabled: false</code></td><td><code>snowflake.enabled: true</code></td></tr>
+          <tr><td>If Snowflake is down</td><td>Not applicable</td><td>Sync is retried next cycle. Ingest and recall keep working.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="up-h">
+    <h2 id="up-h">Upgrading never redoes work</h2>
+    <div class="figure">
+      <svg viewBox="0 0 1000 150" role="img" aria-label="Phases 0 to 7 make version 1. Phase 8 adds Snowflake sync on top to make version 2.">
+        <g id="phases"></g>
+        <text x="20" y="128" class="t-small muted">Version 1: run these, in order</text>
+        <path d="M20 112 H808" class="ln" stroke-dasharray="2 3"/>
+        <text x="830" y="128" class="t-small t-sf">Version 2 adds this</text>
+      </svg>
+    </div>
+    <div class="prose">
+      <p>Version 1 already keeps what version 2 needs: every table has an <code>updated_at</code> column (used to find new rows to push) and an empty <code>sync_state</code> table (remembers how far each sync got). So adding Snowflake later needs no database migration and no rebuild.</p>
+      <p><b>How sync works, in short:</b> after each cycle, rows changed since the last push go into a temporary stage table in Snowflake, then a <code>MERGE</code> inserts new rows and updates rows only when the incoming copy is newer. A new machine pulls rows newer than its own and rebuilds its text index.</p>
+    </div>
+  </section>
+
+  <div class="pager"><a href="memory-file.html">← Memory file</a><a href="roadmap.html">Next: Build phases →</a></div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const PH = ["0 align", "1 base", "2 signatures", "3 ingest", "4 outcomes", "5 recall", "6 jobs", "7 eval"];
+$("phases").innerHTML = PH.map((p, i) => `<g class="phase v1"><rect x="${20 + i * 100}" y="40" width="90" height="56" rx="8"></rect>
+  <text x="${65 + i * 100}" y="64" text-anchor="middle" class="t-strong mono" style="font-size:13px">${p.split(" ")[0]}</text>
+  <text x="${65 + i * 100}" y="82" text-anchor="middle" class="t-small muted">${p.split(" ")[1]}</text></g>`).join("") +
+  `<g class="phase v2"><rect x="830" y="40" width="150" height="56" rx="8"></rect>
+  <text x="905" y="64" text-anchor="middle" class="t-strong mono t-sf" style="font-size:13px">8</text>
+  <text x="905" y="82" text-anchor="middle" class="t-small muted">Snowflake sync</text></g>`;
+let v = 2;
+function setV(n) {
+  v = n;
+  $("fig").classList.toggle("is-v1", n === 1);
+  $("b1").setAttribute("aria-pressed", String(n === 1));
+  $("b2").setAttribute("aria-pressed", String(n === 2));
+  $("cfg").innerHTML = `memory_config.yaml → snowflake.enabled: <span class="${n === 2 ? "on" : "off"}">${n === 2 ? "true" : "false"}</span>`;
+}
+$("b1").onclick = () => setV(1);
+$("b2").onclick = () => setV(2);
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function travel(dot, path, ms) {
+  return new Promise(done => {
+    const len = path.getTotalLength(), t0 = performance.now();
+    function step(t) {
+      const k = Math.min(1, (t - t0) / ms), p = path.getPointAtLength(len * k);
+      dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y);
+      if (k < 1) requestAnimationFrame(step); else { dot.setAttribute("cx", -20); done(); }
+    }
+    requestAnimationFrame(step);
+  });
+}
+let busy = false;
+$("cycle").onclick = async () => {
+  if (busy) return; busy = true;
+  await travel($("pk1"), $("ingestPath"), reduce ? 1 : 900);
+  if (v === 2) {
+    await travel($("pk1"), $("pushPath"), reduce ? 1 : 700);
+    await travel($("pk2"), $("pullPath"), reduce ? 1 : 700);
+  }
+  busy = false;
+};
+setV(2);
+</script>
+</body>
+</html>

@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Signature Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  .grid-head { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; }
+  .cell { fill: var(--sunk); stroke: var(--line); }
+  .cell-l1 { fill: var(--src); }
+  .cell-l2 { fill: var(--mem); }
+  .cell-l3 { fill: var(--tgt); }
+  .lab { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 860px) { .lab { grid-template-columns: 1fr; } }
+  .issue { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+  .issue h3 { display: flex; gap: 8px; align-items: center; }
+  .fields { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fields .wide { grid-column: 1 / -1; }
+  .fields input, .fields select, .fields textarea { width: 100%; min-width: 0; }
+  textarea { font: 0.85rem/1.45 var(--mono); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; resize: vertical; }
+  .derived { display: grid; gap: 6px; background: var(--sunk); border-radius: 8px; padding: 10px 12px; font-size: 0.9rem; }
+  .derived div { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 8px; }
+  .derived dt { color: var(--muted); }
+  .derived dd { margin: 0; font-family: var(--mono); font-size: 0.85rem; overflow-wrap: anywhere; }
+  .hash { display: grid; grid-template-columns: 2.2em minmax(0, 1fr); gap: 8px; align-items: baseline; }
+  .hash b { font-family: var(--mono); }
+  .hash code { background: none; padding: 0; overflow-wrap: anywhere; }
+  .h-l1 b { color: var(--src); } .h-l2 b { color: var(--mem); } .h-l3 b { color: var(--tgt); }
+  .same { outline: 2px solid var(--pass); outline-offset: 2px; border-radius: 4px; }
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ladder rect.bar { fill: var(--sunk); stroke: var(--line); transition: fill 0.25s; }
+  .ladder .hit rect.bar { fill: var(--pass-soft); stroke: var(--pass); stroke-width: 2; }
+  .ladder .best rect.bar { stroke-width: 3; }
+  .ladder text.lv { font-family: var(--mono); font-weight: 500; }
+  .verdict { font-size: var(--step-1); font-family: var(--display); font-weight: 600; }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">Comparex <span>Memory</span></a>
+  <nav class="nav" aria-label="Guide pages">
+    <a href="index.html"><b>1</b>Overview</a>
+    <a href="journey.html"><b>2</b>Life of an issue</a>
+    <a href="signatures.html" aria-current="page"><b>3</b>Signatures</a>
+    <a href="verify.html"><b>4</b>Verification</a>
+    <a href="confidence.html"><b>5</b>Confidence</a>
+    <a href="memory-file.html"><b>6</b>Memory file</a>
+    <a href="versions.html"><b>7</b>Versions</a>
+    <a href="roadmap.html"><b>8</b>Build phases</a>
+  </nav>
+</div></header>
+
+<main>
+  <div class="lede">
+    <span class="eyebrow">Guide 3 · Matching</span>
+    <h1>Signatures: how memory knows two issues are the same problem</h1>
+    <p>Two engineers can describe the same bug in completely different words. Comparex cannot: it reports the same structure every time. Memory turns that structure into a fingerprint, at three levels of strictness.</p>
+  </div>
+
+  <section aria-labelledby="levels">
+    <h2 id="levels">What goes into each level</h2>
+    <div class="figure">
+      <svg viewBox="0 0 1000 250" role="img" aria-labelledby="lv-t">
+        <title id="lv-t">Which fields each signature level uses. L1 uses engine pair, category, exact types, tables and column. L2 uses engine pair, category, type families and value pattern. L3 uses tables and column.</title>
+        <g class="grid-head">
+          <text x="200" y="34" text-anchor="middle" class="muted">ENGINE PAIR</text>
+          <text x="310" y="34" text-anchor="middle" class="muted">CATEGORY</text>
+          <text x="420" y="34" text-anchor="middle" class="muted">EXACT TYPES</text>
+          <text x="530" y="34" text-anchor="middle" class="muted">TYPE FAMILIES</text>
+          <text x="640" y="34" text-anchor="middle" class="muted">VALUE PATTERN</text>
+          <text x="750" y="34" text-anchor="middle" class="muted">TABLES</text>
+          <text x="860" y="34" text-anchor="middle" class="muted">COLUMN</text>
+          <text x="200" y="232" text-anchor="middle" class="muted">sqlserver→snowflake</text>
+          <text x="310" y="232" text-anchor="middle" class="muted">value_mismatch</text>
+          <text x="420" y="232" text-anchor="middle" class="muted">datetime2(7)</text>
+          <text x="530" y="232" text-anchor="middle" class="muted">datetime→datetime</text>
+          <text x="640" y="232" text-anchor="middle" class="muted">fractional_seconds</text>
+          <text x="750" y="232" text-anchor="middle" class="muted">sales.dbo.orders</text>
+          <text x="860" y="232" text-anchor="middle" class="muted">created_at</text>
+        </g>
+        <g>
+          <text x="20" y="78" class="t-strong t-src">L1 · exact</text>
+          <text x="20" y="96" class="t-small muted">same column, same types</text>
+          <text x="20" y="138" class="t-strong t-mem">L2 · structural</text>
+          <text x="20" y="156" class="t-small muted">same problem, any table</text>
+          <text x="20" y="198" class="t-strong t-sf">L3 · object</text>
+          <text x="20" y="216" class="t-small muted">same table, any problem</text>
+        </g>
+        <!-- grid: columns at 200..860 step 110, rows at 70,130,190 -->
+        <g id="cells"></g>
+      </svg>
+    </div>
+    <div class="cols">
+      <div class="card"><h3>L1 finds the exact repeat</h3><p>The same column on the same tables, with the same types, fails in the same way again. The strongest match: whatever fixed it last time is very likely to fix it now.</p></div>
+      <div class="card"><h3>L2 carries lessons across tables</h3><p>Table names are left out on purpose. Any SQL Server datetime that lost sub-second digits in Snowflake looks the same, so a fix proven on orders helps on invoices too.</p></div>
+      <div class="card"><h3>L3 brings up table history</h3><p>Only the tables and column. Even if the problem is new, past issues on this table can carry warnings (“the audit job reads this column”).</p></div>
+    </div>
+    <div class="note"><b>And L4?</b> When nothing matches structurally, memory falls back to text similarity over the issue titles and notes (TF-IDF plus LSA, a classic technique with no model involved). It counts the least: weight 0.3 times the similarity.</div>
+  </section>
+
+  <section aria-labelledby="pattern">
+    <h2 id="pattern">The value pattern is the secret ingredient</h2>
+    <div class="prose">
+      <p>“Values don't match” is too vague to learn from. What matters is <em>how</em> they differ. Memory looks at the sample value pairs in the compare result, runs a list of simple rules in order, and keeps the name of the first rule that fits at least 60% of the samples. Then it throws the samples away.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Pattern name</th><th>Example pair (source → target)</th><th>Typical cause</th></tr></thead>
+        <tbody>
+          <tr><td><code>null_vs_empty</code></td><td><code>NULL</code> → <code>""</code></td><td>Empty strings loaded as NULL or the other way round</td></tr>
+          <tr><td><code>trailing_whitespace</code></td><td><code>"ACME  "</code> → <code>"ACME"</code></td><td>CHAR padding, or a trim in one pipeline</td></tr>
+          <tr><td><code>case_diff</code></td><td><code>"Acme"</code> → <code>"ACME"</code></td><td>Upper-casing or a case-insensitive collation</td></tr>
+          <tr><td><code>unicode_normalization</code></td><td>é (one char) → é (e + accent)</td><td>Different Unicode normal forms</td></tr>
+          <tr><td><code>leading_zeros</code></td><td><code>"00042"</code> → <code>"42"</code></td><td>A code stored as a number on one side</td></tr>
+          <tr><td><code>boolean_repr</code></td><td><code>1</code> → <code>true</code></td><td>BIT vs BOOLEAN</td></tr>
+          <tr><td><code>tz_shift</code></td><td><code>10:00</code> → <code>15:00</code></td><td>Whole-hour shift: a timezone conversion</td></tr>
+          <tr><td><code>fractional_seconds</code></td><td><code>…:00.1234567</code> → <code>…:00.123457</code></td><td>DATETIME2(7) rounded to microseconds</td></tr>
+          <tr><td><code>precision_loss</code></td><td><code>10.00004</code> → <code>10.0</code></td><td>Rounding in a DECIMAL or FLOAT conversion</td></tr>
+          <tr><td><code>other</code></td><td>anything else</td><td>No rule reached 60%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="labh">
+    <h2 id="labh">Try it: is a past issue a match?</h2>
+    <div class="prose"><p>Edit either issue, or load a scenario. The hashes below are computed in your browser with exactly the same rules as the reference Python code, so you can see which change breaks which level.</p></div>
+    <div class="presets" role="group" aria-label="Scenarios">
+      <button type="button" data-preset="l1">Same column again</button>
+      <button type="button" data-preset="l2">Same problem, other table</button>
+      <button type="button" data-preset="l3">Same table, other problem</button>
+      <button type="button" data-preset="none">Nothing in common</button>
+    </div>
+    <div class="lab" id="lab"></div>
+
+    <div class="figure narrow">
+      <svg class="ladder" viewBox="0 0 640 200" role="img" aria-label="Match levels" id="ladder"></svg>
+    </div>
+    <p class="verdict" id="verdict" aria-live="polite"></p>
+    <p class="caption">The weight is how much a match counts when memory ranks past fixes. The best level wins: an L1 match is not counted again as L2 and L3.</p>
+  </section>
+
+  <div class="pager"><a href="journey.html">← Life of an issue</a><a href="verify.html">Next: Verification →</a></div>
+</main>
+
+<script id="logic">
+// Ports of reference/comparex_memory/signature/{type_map,value_patterns,hashing}.py and entities.normalize_object.
+const TYPE_MAP = {
+  sqlserver: {varchar:"string",nvarchar:"string",char:"string",nchar:"string",text:"string",int:"integer",bigint:"integer",smallint:"integer",tinyint:"integer",decimal:"decimal",numeric:"decimal",money:"decimal",smallmoney:"decimal",float:"float",real:"float",datetime:"datetime",datetime2:"datetime",smalldatetime:"datetime",datetimeoffset:"datetime_tz",date:"date",time:"time",bit:"boolean",varbinary:"binary",binary:"binary",uniqueidentifier:"string"},
+  snowflake: {varchar:"string",string:"string",text:"string",char:"string",number:"decimal",int:"integer",integer:"integer",bigint:"integer",float:"float",double:"float",real:"float",timestamp_ntz:"datetime",timestamp_ltz:"datetime_tz",timestamp_tz:"datetime_tz",date:"date",time:"time",boolean:"boolean",binary:"binary",variant:"semi_structured",object:"semi_structured",array:"semi_structured"},
+};
+function parseType(raw, engine) {
+  if (raw == null || !String(raw).trim()) return null;
+  const text = String(raw).trim().toLowerCase();
+  const m = text.match(/^\s*([a-z_][a-z0-9_ ]*?)\s*(?:\(\s*([^)]*)\s*\))?\s*$/);
+  if (!m) return { base: text, family: "unknown", full: text };
+  const base = m[1].split(/\s+/).join(" ");
+  let full = base;
+  if (m[2] !== undefined) full = `${base}(${m[2].split(",").map(p => p.trim()).filter(Boolean).join(",")})`;
+  return { base, family: (TYPE_MAP[engine] || {})[base] || "unknown", full };
+}
+function normalizeObject(name) {
+  if (name == null) return null;
+  const s = String(name).replace(/[\[\]"`]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  return s.split(".").map(p => p.trim()).join(".");
+}
+function num(x) { const s = String(x ?? "").trim(); if (!s) return null; const n = Number(s); return Number.isFinite(n) ? n : null; }
+function dt(x) {  // microseconds since epoch, UTC, or null
+  if (x == null) return null;
+  let s = String(x).trim();
+  if (!s) return null;
+  s = s.replace(/\.(\d+)/, (_, d) => "." + d.slice(0, 6));
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/);
+  if (!m) return null;
+  const [, y, mo, d, h = "0", mi = "0", se = "0", frac = "", tz] = m;
+  let us = Date.UTC(+y, +mo - 1, +d, +h, +mi, +se) * 1000 + Number(frac.padEnd(6, "0") || 0);
+  if (tz && tz !== "Z") { const sign = tz[0] === "-" ? -1 : 1; const t = tz.slice(1).replace(":", ""); us -= sign * (+t.slice(0, 2) * 60 + +t.slice(2)) * 60e6; }
+  return us;
+}
+const both = (a, b) => a !== null && b !== null;
+const TRUE = new Set(["1","true","t","yes","y"]), FALSE = new Set(["0","false","f","no","n"]);
+const bool = v => { v = String(v).trim().toLowerCase(); return TRUE.has(v) ? true : FALSE.has(v) ? false : null; };
+const RULES = [
+  ["null_vs_empty", (a, b) => (a === null && b !== null && b.trim() === "") || (b === null && a !== null && a.trim() === "")],
+  ["trailing_whitespace", (a, b) => both(a, b) && a.trim() === b.trim()],
+  ["case_diff", (a, b) => both(a, b) && a.toLowerCase() === b.toLowerCase()],
+  ["unicode_normalization", (a, b) => both(a, b) && a.normalize("NFC") === b.normalize("NFC")],
+  ["leading_zeros", (a, b) => { if (!both(a, b)) return false; a = a.trim(); b = b.trim(); return /^\d+$/.test(a) && /^\d+$/.test(b) && a.replace(/^0+/, "") === b.replace(/^0+/, ""); }],
+  ["boolean_repr", (a, b) => { if (!both(a, b)) return false; const x = bool(a); return x !== null && x === bool(b); }],
+  ["tz_shift", (a, b) => { const x = dt(a), y = dt(b); if (x === null || y === null) return false; const d = Math.abs(x - y) / 1e6; return d > 0 && d % 3600 === 0 && d <= 14 * 3600; }],
+  ["fractional_seconds", (a, b) => { const x = dt(a), y = dt(b); if (x === null || y === null) return false; const d = Math.abs(x - y) / 1e6; return d > 0 && d < 1; }],
+  ["precision_loss", (a, b) => { const x = num(a), y = num(b); if (x === null || y === null) return false; const d = Math.abs(x - y); return d > 0 && d <= 0.0001 * Math.max(1, Math.abs(x)); }],
+];
+function classify(samples, minShare = 0.6) {
+  if (!samples.length) return null;
+  for (const [name, fn] of RULES) {
+    const hits = samples.filter(([a, b]) => a !== b && fn(a, b)).length;
+    if (hits / samples.length >= minShare) return name;
+  }
+  return "other";
+}
+async function sha16(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+}
+async function H(level, ...parts) {
+  const norm = parts.map(p => p == null ? "-" : String(p).trim().toLowerCase());
+  return `${level}:` + await sha16(norm.join("|"));
+}
+async function signature(s) {
+  const st = parseType(s.sourceType, s.sourceEngine), tt = parseType(s.targetType, s.targetEngine);
+  const pair = `${s.sourceEngine}->${s.targetEngine}`;
+  const so = normalizeObject(s.sourceObject), to = normalizeObject(s.targetObject);
+  const col = s.column ? s.column.trim().toLowerCase() : null;
+  const fams = `${st ? st.family : "-"}->${tt ? tt.family : "-"}`;
+  const vp = classify(s.samples);
+  return {
+    st, tt, fams, vp, so, to, col,
+    human: [pair, s.category, fams, vp || "-"].join(" | "),
+    l1: await H("L1", pair, s.category, st && st.full, tt && tt.full, `${so}>${to}`, col),
+    l2: await H("L2", pair, s.category, fams, vp),
+    l3: await H("L3", so, to, col),
+  };
+}
+</script>
+<script>
+const CATEGORIES = ["value_mismatch","type_mismatch","missing_column","extra_column","row_count","missing_rows","extra_rows","null_handling","nullability_mismatch","length_mismatch","precision_scale","collation","duplicate_keys","other"];
+const BASE = { sourceEngine: "sqlserver", targetEngine: "snowflake", category: "value_mismatch",
+  sourceObject: "[Sales].[dbo].[Orders]", targetObject: "SALES.PUBLIC.ORDERS", column: "created_at",
+  sourceType: "DATETIME2(7)", targetType: "TIMESTAMP_NTZ(9)",
+  samples: "2026-08-01 10:00:00.1234567 | 2026-08-01 10:00:00.123457\n2026-08-02 09:15:30.9876548 | 2026-08-02 09:15:30.987655" };
+const PRESETS = {
+  l1: { ...BASE },
+  l2: { ...BASE, sourceObject: "[Billing].[dbo].[Invoices]", targetObject: "BILLING.PUBLIC.INVOICES", column: "issued_at", sourceType: "DATETIME2(7)", targetType: "TIMESTAMP_NTZ(6)",
+        samples: "2026-07-11 08:00:01.5555557 | 2026-07-11 08:00:01.555556" },
+  l3: { ...BASE, category: "nullability_mismatch", samples: "" },
+  none: { ...BASE, category: "value_mismatch", sourceObject: "[Crm].[dbo].[Customers]", targetObject: "CRM.PUBLIC.CUSTOMERS", column: "name", sourceType: "NVARCHAR(100)", targetType: "VARCHAR(100)",
+        samples: "ACME   | ACME\nGlobex  | Globex" },
+};
+const sides = [
+  { id: "a", title: "New issue", chip: "ISSUE-140", data: { ...BASE } },
+  { id: "b", title: "Past issue", chip: "ISSUE-123", data: { ...PRESETS.l2 } },
+];
+const lab = document.getElementById("lab");
+const opt = (vals, v) => vals.map(x => `<option${x === v ? " selected" : ""}>${x}</option>`).join("");
+for (const s of sides) {
+  const d = s.data;
+  const el = document.createElement("div");
+  el.className = "issue";
+  el.innerHTML = `<h3>${s.title} <span class="chip muted">${s.chip}</span></h3>
+  <div class="fields">
+    <label for="${s.id}-se">Source engine<select id="${s.id}-se" data-k="sourceEngine">${opt(["sqlserver","snowflake"], d.sourceEngine)}</select></label>
+    <label for="${s.id}-te">Target engine<select id="${s.id}-te" data-k="targetEngine">${opt(["snowflake","sqlserver"], d.targetEngine)}</select></label>
+    <label class="wide" for="${s.id}-cat">Difference category<select id="${s.id}-cat" data-k="category">${opt(CATEGORIES, d.category)}</select></label>
+    <label for="${s.id}-so">Source table<input id="${s.id}-so" data-k="sourceObject"></label>
+    <label for="${s.id}-to">Target table<input id="${s.id}-to" data-k="targetObject"></label>
+    <label for="${s.id}-st">Source type<input id="${s.id}-st" data-k="sourceType"></label>
+    <label for="${s.id}-tt">Target type<input id="${s.id}-tt" data-k="targetType"></label>
+    <label class="wide" for="${s.id}-col">Column<input id="${s.id}-col" data-k="column"></label>
+    <label class="wide" for="${s.id}-sm">Sample pairs, one per line: <span class="mono">source | target</span> (write NULL for a null)<textarea id="${s.id}-sm" rows="3" data-k="samples"></textarea></label>
+  </div>
+  <dl class="derived" id="${s.id}-out"></dl>`;
+  lab.appendChild(el);
+  s.el = el;
+}
+function fill(s) { s.el.querySelectorAll("[data-k]").forEach(i => { i.value = s.data[i.dataset.k]; }); }
+function read(s) {
+  const d = {};
+  s.el.querySelectorAll("[data-k]").forEach(i => { d[i.dataset.k] = i.value; });
+  d.samples = d.samples.split("\n").filter(l => l.includes("|")).map(l => {
+    const [a, b] = l.split("|"); const v = x => x.trim() === "NULL" ? null : x.replace(/^ /, "").replace(/ $/, "");
+    return [v(a), v(b)];
+  });
+  return d;
+}
+const LEVELS = [["L1", 1.0, "exact repeat"], ["L2", 0.8, "same problem, other table"], ["L3", 0.5, "same table"], ["L4", 0.3, "text similarity only (× similarity)"]];
+const ladder = document.getElementById("ladder");
+ladder.innerHTML = LEVELS.map(([lv, w, txt], i) => `<g data-lv="${lv}">
+  <rect class="bar" x="10" y="${10 + i * 46}" width="${560 * w}" height="36" rx="6"></rect>
+  <text class="lv" x="22" y="${33 + i * 46}">${lv}</text>
+  <text x="64" y="${33 + i * 46}" class="t-small">${txt}</text>
+  <text x="${560 * w + 22}" y="${33 + i * 46}" class="t-small mono muted">${w.toFixed(1)}</text></g>`).join("");
+
+async function update() {
+  let res;
+  try { res = await Promise.all(sides.map(s => signature(read(s)))); }
+  catch (e) { document.getElementById("verdict").textContent = "This browser blocked the hashing API. Open the page from a local web server or a newer browser."; return; }
+  sides.forEach((s, i) => {
+    const r = res[i], o = res[1 - i];
+    const mark = k => r[k] === o[k] ? " same" : "";
+    document.getElementById(`${s.id}-out`).innerHTML = `
+      <div><dt>Tables</dt><dd>${r.so} &gt; ${r.to}</dd></div>
+      <div><dt>Type families</dt><dd>${r.fams}</dd></div>
+      <div><dt>Value pattern</dt><dd>${r.vp ?? "none (no samples)"}</dd></div>
+      <div><dt>Reads as</dt><dd>${r.human}</dd></div>
+      <div class="hash h-l1"><b>L1</b><code class="${mark("l1")}">${r.l1}</code></div>
+      <div class="hash h-l2"><b>L2</b><code class="${mark("l2")}">${r.l2}</code></div>
+      <div class="hash h-l3"><b>L3</b><code class="${mark("l3")}">${r.l3}</code></div>`;
+  });
+  const [a, b] = res;
+  const hit = { L1: a.l1 === b.l1, L2: a.l2 === b.l2, L3: a.l3 === b.l3, L4: !(a.l1 === b.l1 || a.l2 === b.l2 || a.l3 === b.l3) };
+  const best = ["L1", "L2", "L3"].find(l => hit[l]) || "L4";
+  ladder.querySelectorAll("g[data-lv]").forEach(g => {
+    g.classList.toggle("hit", hit[g.dataset.lv] && (g.dataset.lv !== "L4"));
+    g.classList.toggle("best", g.dataset.lv === best && best !== "L4");
+  });
+  const v = document.getElementById("verdict");
+  v.textContent = best === "L1" ? "L1 match: this is the same problem on the same column. Its fix counts at full weight."
+    : best === "L2" ? "L2 match: same kind of problem on another table. Its fix counts at 0.8."
+    : best === "L3" ? "L3 match: same table, different problem. Its caveats and history count at 0.5."
+    : "No structural match. Memory would only find this through text similarity (L4), if the descriptions are alike.";
+}
+lab.addEventListener("input", update);
+document.querySelectorAll("[data-preset]").forEach(btn => btn.addEventListener("click", () => {
+  sides[1].data = { ...PRESETS[btn.dataset.preset] }; sides[0].data = { ...BASE };
+  sides.forEach(fill); update();
+  document.querySelectorAll("[data-preset]").forEach(x => x.setAttribute("aria-pressed", String(x === btn)));
+}));
+sides.forEach(fill);
+document.querySelector('[data-preset="l2"]').setAttribute("aria-pressed", "true");
+update();
+
+// static "what goes into each level" grid
+const USE = { L1: [1,1,1,0,0,1,1], L2: [1,1,0,1,1,0,0], L3: [0,0,0,0,0,1,1] };
+const cls = { L1: "cell-l1", L2: "cell-l2", L3: "cell-l3" };
+document.getElementById("cells").innerHTML = ["L1", "L2", "L3"].map((lv, r) =>
+  USE[lv].map((u, c) => `<rect x="${200 + c * 110 - 46}" y="${62 + r * 60}" width="92" height="40" rx="6" class="${u ? cls[lv] : "cell"}"></rect>` +
+    (u ? `<text x="${200 + c * 110}" y="${87 + r * 60}" text-anchor="middle" class="t-small" style="fill:var(--bg);font-weight:600">used</text>` : "")).join("")).join("");
+</script>
+</body>
+</html>

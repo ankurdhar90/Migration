@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Life of an Issue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  .track { stroke: var(--line); stroke-width: 3; }
+  .track-done { stroke: var(--mem); stroke-width: 3; transition: all 0.3s; }
+  .stop circle { fill: var(--panel); stroke: var(--line); stroke-width: 2; transition: all 0.25s; }
+  .stop.mem circle { stroke: var(--mem); }
+  .stop text.n { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+  .stop.done circle { fill: var(--mem-soft); }
+  .stop.on circle { fill: var(--mem); stroke: var(--mem); }
+  .stop.on text.n { fill: var(--bg); }
+  .stop { cursor: pointer; }
+  .stop:focus-visible circle { stroke: var(--focus); stroke-width: 3; }
+  .who { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; }
+  .stage { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+  @media (max-width: 820px) { .stage { grid-template-columns: 1fr; } }
+  .stage-text { display: grid; gap: 12px; align-content: start; }
+  .stage-text .who-chip { justify-self: start; }
+  .why { color: var(--muted); }
+  .why b { color: var(--fg); }
+  .ctrl { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .ctrl .count { font-family: var(--mono); font-size: var(--step--1); color: var(--muted); margin-left: auto; }
+  .stores { display: grid; gap: 6px; }
+  .stores span { font-size: var(--step--1); color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">Comparex <span>Memory</span></a>
+  <nav class="nav" aria-label="Guide pages">
+    <a href="index.html"><b>1</b>Overview</a>
+    <a href="journey.html" aria-current="page"><b>2</b>Life of an issue</a>
+    <a href="signatures.html"><b>3</b>Signatures</a>
+    <a href="verify.html"><b>4</b>Verification</a>
+    <a href="confidence.html"><b>5</b>Confidence</a>
+    <a href="memory-file.html"><b>6</b>Memory file</a>
+    <a href="versions.html"><b>7</b>Versions</a>
+    <a href="roadmap.html"><b>8</b>Build phases</a>
+  </nav>
+</div></header>
+
+<main>
+  <div class="lede">
+    <span class="eyebrow">Guide 2 · Walkthrough</span>
+    <h1>Life of an issue</h1>
+    <p>Follow one real-looking problem, a timestamp precision mismatch on <code>sales.dbo.orders.created_at</code>, from the moment Comparex finds it to the moment memory helps fix the next one. Click a stop, or use the buttons and your arrow keys.</p>
+  </div>
+
+  <section aria-label="Walkthrough">
+    <div class="figure">
+      <svg id="rail" viewBox="0 0 1000 130" role="group" aria-label="Eight steps of an issue's life">
+        <line x1="60" y1="48" x2="935" y2="48" class="track"/>
+        <line id="done" x1="60" y1="48" x2="60" y2="48" class="track-done"/>
+      </svg>
+      <p class="caption" style="margin-top:8px">Grey rings are things the existing pipeline does. Amber rings are things memory does.</p>
+    </div>
+
+    <div class="ctrl">
+      <button id="prev" type="button">← Back</button>
+      <button id="next" type="button" class="primary">Next step →</button>
+      <button id="play" type="button" aria-pressed="false">Play all</button>
+      <span class="count" id="count" aria-live="polite"></span>
+    </div>
+
+    <div class="stage">
+      <div class="stage-text">
+        <span class="chip" id="who"></span>
+        <h3 id="title"></h3>
+        <p id="what"></p>
+        <p class="why" id="why"></p>
+      </div>
+      <div class="stores">
+        <span id="storeLabel"></span>
+        <pre class="block" id="store"></pre>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="loop">
+    <h2 id="loop">Why this is a loop, not a line</h2>
+    <div class="prose">
+      <p>Steps 1 to 7 happen for every issue. Step 8 is where the payoff shows up: the <b>next</b> issue with the same structure gets a memory file that already knows what worked. Every new fix, pass or fail, feeds back into step 7, so recommendations keep improving without anyone curating them.</p>
+      <p>Memory runs this as a repeating <b>ingest cycle</b> (every few minutes, or from the scheduler). Each cycle only looks at files and commits that changed since the last one, so running it twice changes nothing.</p>
+    </div>
+  </section>
+
+  <div class="pager"><a href="index.html">← Overview</a><a href="signatures.html">Next: Signatures →</a></div>
+</main>
+
+<script>
+const STEPS = [
+  { who: "pipeline", short: ["Compare", "run"], title: "Comparex compares two tables",
+    what: "Comparex compares SQL Server sales.dbo.orders with Snowflake SALES.PUBLIC.ORDERS and writes a result file. One difference: created_at values do not match on 1,200 rows. The file also carries a few sample value pairs.",
+    why: "<b>Memory's view:</b> this file is ground truth. Memory never edits it, only reads it.",
+    label: "Result file written by Comparex (shape varies, an adapter reads it)",
+    store: `{
+  "run_id": "RUN-0001",
+  "source": {"engine": "sqlserver", "object": "[Sales].[dbo].[Orders]"},
+  "target": {"engine": "snowflake", "object": "SALES.PUBLIC.ORDERS"},
+  "differences": [{
+    "category": "value_mismatch", "column": "CREATED_AT",
+    "source_type": "DATETIME2(7)", "target_type": "TIMESTAMP_NTZ(9)",
+    "rows_affected": 1200,
+    "samples": [["2026-08-01 10:00:00.1234567",
+                 "2026-08-01 10:00:00.123457"]]
+  }]
+}` },
+  { who: "memory", short: ["Read +", "fingerprint"], title: "Memory reads the run and fingerprints it",
+    what: "The ingester reads the new result file. It looks at the samples just long enough to name the pattern (here, the values differ by less than a second: fractional_seconds), then drops them. It builds the L1, L2 and L3 signatures and saves one row per difference.",
+    why: "<b>Why drop the samples?</b> Real customer values must never be stored. A label like fractional_seconds is enough to recognise the problem next time.",
+    label: "Row saved in run_differences (no values, only labels and hashes)",
+    store: `run_id        RUN-0001
+diff_category value_mismatch
+column_ref    created_at
+rows_affected 1200
+sig_l1        L1:ba245aadeabe22a2
+sig_l2        L2:00d4db6439d09b3a
+sig_l3        L3:7a954ad9d3850721
+fields_json   {"type_family_pair": "datetime->datetime",
+               "value_pattern": "fractional_seconds", ...}` },
+  { who: "pipeline", short: ["Issue", "file"], title: "An issue file is created",
+    what: "The pipeline writes issues/ISSUE-123.md as it does today. Memory finds it on the next cycle, reads the ID, the tables and the run, and links the issue to that run's differences. The difference with the most rows becomes the issue's primary signature.",
+    why: "<b>No format change needed:</b> where each field lives (front matter, a 'Label: value' line, a heading) is described in config, not code.",
+    label: "Row saved in issues and issue_signatures",
+    store: `issue_id     ISSUE-123
+status       open
+run_id       RUN-0001
+source       sales.dbo.orders
+target       sales.public.orders
+rows_affected 1200
+signatures   L1 (primary), L2, L3` },
+  { who: "pipeline", short: ["Triage +", "handoff"], title: "Copilot triages, then hands off to Amp",
+    what: "A Copilot CLI agent writes the triage file (category, severity, notes). Then a handoff file tells Amp what to fix, with steps and caveats. Memory picks up both: status moves to triaged, then in_progress. Each caveat bullet becomes an observation.",
+    why: "<b>Caveats matter:</b> a line like “[blocker] Do not change source precision” is remembered and shown to every future agent working on this kind of problem.",
+    label: "What memory keeps from the handoff",
+    store: `status        in_progress
+summary       Normalise timestamp precision in compare config
+steps         1. Set datetime_precision: 6 in config/compare/orders.yaml
+              2. Re-run compare for orders
+observations  [warning] Hides sub-microsecond drift; accepted` },
+  { who: "pipeline", short: ["Amp", "commits"], title: "Amp fixes it and commits",
+    what: "Amp commits “Fix ISSUE-123: normalise timestamp precision”. Memory reads the commit, finds the issue ID in the message, and sees that config/compare/orders.yaml changed the key datetime_precision. That gives the approach key config_change:datetime_precision.",
+    why: "<b>Approach keys group fixes:</b> anyone who fixes a similar issue by changing the same config key adds evidence to the same approach.",
+    label: "Row saved in resolutions",
+    store: `resolution_id   7c1e…  (stable: same inputs, same ID)
+issue_id        ISSUE-123
+attempt_no      1
+resolution_type config_change      (path matched config/compare/**)
+approach_key    config_change:datetime_precision
+commit_sha      3f2a9c1
+link_method     issue_ref` },
+  { who: "pipeline", short: ["Next", "compare"], title: "Comparex runs again",
+    what: "The next scheduled compare of the same table pair runs as usual. Memory treats it as the verifying run for ISSUE-123's fix, because it is the first run on those tables after the commit.",
+    why: "<b>Nobody has to trigger anything:</b> memory waits for the run that would happen anyway. If none comes within 14 days, the fix is marked unverified.",
+    label: "New compare run, read like any other",
+    store: `run_id      RUN-0002
+started_at  after the fix commit
+differences no row with sig_l1 = L1:ba245aadeabe22a2` },
+  { who: "memory", short: ["Verify +", "score"], title: "Memory checks the fix and updates the score",
+    what: "The issue's primary L1 signature is gone from the new run, so the outcome is pass. The issue becomes verified. Memory then recomputes the confidence for this approach on this L2 signature, and promotes it to an active playbook once it has enough passes.",
+    why: "<b>Evidence, not opinions:</b> the handoff could say anything. Only Comparex's own result decides pass, partial or fail.",
+    label: "Rows saved in outcomes and playbooks",
+    store: `outcome     pass   (rows 1200 → 0)
+minutes     25 from opened to verified
+
+playbook    L2:00d4db… + config_change:datetime_precision
+passes      5 of 5 (across 5 issues)
+confidence  0.86
+status      active` },
+  { who: "memory", short: ["Next issue", "remembers"], title: "The next similar issue gets a memory file",
+    what: "Weeks later ISSUE-140 appears on a different table, but with the same L2 signature. Memory finds ISSUE-123 and others, ranks their fixes, and writes .memory/ISSUE-140.memory.md. Triage and Amp read it because of one line in their instructions.",
+    why: "<b>Advisory only:</b> the file starts by saying current Comparex results take precedence, and every claim cites the issue or commit it came from.",
+    label: ".memory/ISSUE-140.memory.md (excerpt)",
+    store: `# Memory for ISSUE-140
+Signature (L2): sqlserver->snowflake | value_mismatch |
+                datetime->datetime | fractional_seconds
+
+## Recommended (fastest proven)
+config_change:datetime_precision · confidence 0.86
+· 5/5 verified · median 25 min
+Steps: see ISSUE-123 handoff, section "Resolution"
+
+## Caveats
+- [warning] Hides sub-microsecond drift; accepted (ISSUE-123)` },
+];
+
+const NS = "http://www.w3.org/2000/svg";
+const rail = document.getElementById("rail");
+const xs = STEPS.map((_, i) => 60 + i * 125);
+const stops = STEPS.map((s, i) => {
+  const g = document.createElementNS(NS, "g");
+  g.setAttribute("class", "stop" + (s.who === "memory" ? " mem" : ""));
+  g.setAttribute("tabindex", "0");
+  g.setAttribute("role", "button");
+  g.setAttribute("aria-label", `Step ${i + 1}: ${s.title}`);
+  g.innerHTML = `<circle cx="${xs[i]}" cy="48" r="19"></circle>
+    <text class="n" x="${xs[i]}" y="53" text-anchor="middle">${i + 1}</text>
+    <text x="${xs[i]}" y="92" text-anchor="middle" class="t-small">${s.short[0]}</text>
+    <text x="${xs[i]}" y="108" text-anchor="middle" class="t-small">${s.short[1]}</text>
+    <text x="${xs[i]}" y="16" text-anchor="middle" class="who ${s.who === "memory" ? "t-mem" : "muted"}">${s.who === "memory" ? "MEMORY" : "PIPELINE"}</text>`;
+  g.addEventListener("click", () => go(i));
+  g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(i); } });
+  rail.appendChild(g);
+  return g;
+});
+
+let cur = 0, timer = null;
+const $ = id => document.getElementById(id);
+function go(i) {
+  cur = Math.max(0, Math.min(STEPS.length - 1, i));
+  const s = STEPS[cur];
+  stops.forEach((g, j) => {
+    g.classList.toggle("on", j === cur);
+    g.classList.toggle("done", j < cur);
+  });
+  $("done").setAttribute("x2", xs[cur]);
+  const who = $("who");
+  who.className = "chip " + (s.who === "memory" ? "partial" : "muted");
+  who.textContent = s.who === "memory" ? "Memory does this" : "Pipeline does this, unchanged";
+  $("title").textContent = s.title;
+  $("what").textContent = s.what;
+  $("why").innerHTML = s.why;
+  $("storeLabel").textContent = s.label;
+  $("store").textContent = s.store;
+  $("count").textContent = `Step ${cur + 1} of ${STEPS.length}`;
+  $("prev").disabled = cur === 0;
+  $("next").disabled = cur === STEPS.length - 1;
+}
+function stop() { clearInterval(timer); timer = null; $("play").setAttribute("aria-pressed", "false"); $("play").textContent = "Play all"; }
+$("prev").onclick = () => { stop(); go(cur - 1); };
+$("next").onclick = () => { stop(); go(cur + 1); };
+$("play").onclick = () => {
+  if (timer) return stop();
+  if (cur === STEPS.length - 1) go(0);
+  $("play").setAttribute("aria-pressed", "true"); $("play").textContent = "Pause";
+  timer = setInterval(() => cur < STEPS.length - 1 ? go(cur + 1) : stop(), 3200);
+};
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input, select, textarea")) return;
+  if (e.key === "ArrowRight") { stop(); go(cur + 1); }
+  if (e.key === "ArrowLeft") { stop(); go(cur - 1); }
+});
+go(0);
+</script>
+</body>
+</html>
