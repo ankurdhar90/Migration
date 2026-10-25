@@ -1,0 +1,119 @@
+# Starting point only. Phase 3a fits these values to the real repository.
+memory_dir: ".memory"                 # the ONLY directory the layer writes files to
+db_path: ".memory/memory.db"
+
+paths:                                # glob patterns, relative to repo root
+  issues: "issues/**/*.md"
+  triage: "triage/**/*.md"
+  handoff: "handoff/**/*.md"
+  compare_results: "results/**/*.json"
+
+issue_id_pattern: "ISSUE-\\d+"        # regex; first match in file name, else in file body
+
+compare:
+  adapter: "reference_json"           # name registered in compare_adapters.py
+  engine_names:                       # normalize engine labels found in results
+    "mssql": "sqlserver"
+    "sql server": "sqlserver"
+    "snowflake": "snowflake"
+
+# How to find fields inside MD files. Locator kinds:
+#   frontmatter: key in YAML front matter
+#   label: a "Label: value" line (case-insensitive, optional bold **Label:**)
+#   section: text under a heading with one of these titles (any level)
+#   heading: text of the first heading of this level
+#   table: value from a 2-column Markdown table where column 1 == key
+fields:
+  issue:
+    title:        [{heading: 1}, {frontmatter: "title"}]
+    source_table: [{label: "Source table"}, {table: "Source"}]
+    target_table: [{label: "Target table"}, {table: "Target"}]
+    run_id:       [{label: "Run"}, {frontmatter: "run_id"}]
+    column:       [{label: "Column"}, {frontmatter: "column"}]
+    created:      [{frontmatter: "created"}, {label: "Created"}]
+    description:  [{section: ["Description", "Summary", "Details"]}]
+  triage:
+    category:     [{label: "Category"}, {frontmatter: "category"}]
+    severity:     [{label: "Severity"}, {frontmatter: "severity"}]
+    notes:        [{section: ["Triage", "Analysis", "Notes"]}]
+  handoff:
+    summary:      [{section: ["Summary", "Resolution summary"]}]
+    steps:        [{section: ["Resolution", "Steps", "Fix"]}]
+    observations: [{section: ["Notes", "Caveats", "Observations", "Warnings"]}]
+    accepted:     [{label: "Accepted difference"}, {frontmatter: "accepted"}]
+
+git:
+  issue_ref_pattern: "ISSUE-\\d+"     # searched in commit subject, body and branch names
+  fallback_window_hours: 72           # used when a commit has no issue ID (Phase 2)
+
+resolution_rules:                     # first match wins; paths are globs on changed files
+  - {match_path: "config/compare/**", type: "config_change"}
+  - {match_path: "sql/views/**",      type: "mapping_change"}
+  - {match_path: "sql/source/**",     type: "source_fix"}
+  - {match_path: "sql/target/**",     type: "target_fix"}
+  - {match_path: "transforms/**",     type: "transform_change"}
+  - {handoff_flag: "accepted",        type: "accept_known_diff"}
+default_resolution_type: "other_change"
+
+approach_key:
+  # approach_key = "<resolution_type>:<detail>". The detail is the first match of:
+  detail_sources:
+    - {kind: "config_key_changed"}    # top-level key changed in a YAML/JSON config file
+    - {kind: "object_changed"}        # file stem of the first changed SQL file
+    - {kind: "keyword", map: {"precision": "precision", "timezone": "timezone",
+                               "collation": "collation", "trim": "trim",
+                               "rounding": "rounding", "cast": "cast"}}
+  fallback_detail: "general"
+
+type_map:                             # engine type (lowercase, no params) -> family
+  sqlserver: {varchar: string, nvarchar: string, char: string, nchar: string, text: string,
+              int: integer, bigint: integer, smallint: integer, tinyint: integer,
+              decimal: decimal, numeric: decimal, money: decimal, smallmoney: decimal,
+              float: float, real: float,
+              datetime: datetime, datetime2: datetime, smalldatetime: datetime,
+              datetimeoffset: datetime_tz, date: date, time: time, bit: boolean,
+              varbinary: binary, binary: binary, uniqueidentifier: string}
+  snowflake: {varchar: string, string: string, text: string, char: string,
+              number: decimal, int: integer, integer: integer, bigint: integer,
+              float: float, double: float, real: float,
+              timestamp_ntz: datetime, timestamp_ltz: datetime_tz, timestamp_tz: datetime_tz,
+              date: date, time: time, boolean: boolean, binary: binary,
+              variant: semi_structured, object: semi_structured, array: semi_structured}
+
+value_patterns:                       # ordered; first rule matched by >= min_share of samples wins
+  min_share: 0.6
+  rules:
+    - {name: "null_vs_empty",       kind: "null_vs_empty"}
+    - {name: "trailing_whitespace", kind: "trim_equal"}
+    - {name: "case_diff",           kind: "casefold_equal"}
+    - {name: "unicode_normalization", kind: "nfc_equal"}
+    - {name: "leading_zeros",       kind: "leading_zeros_equal"}
+    - {name: "boolean_repr",        kind: "boolean_equal"}
+    - {name: "tz_shift",            kind: "datetime_whole_hours"}
+    - {name: "fractional_seconds",  kind: "datetime_subsecond"}
+    - {name: "precision_loss",      kind: "numeric_close", tolerance: 0.0001}
+  fallback: "other"
+
+verification:
+  window_days: 14                     # no covering run within this -> unverified
+  reopen_days: 30
+  half_life_days: 180                 # outcome weight halves every 180 days
+
+playbooks:
+  activate_min_passes: 2
+  activate_min_confidence: 0.7
+  retire_below_confidence: 0.4
+  retire_after_losses_in_row: 3
+
+recall:
+  max_approaches: 3
+  max_similar_issues: 5
+  max_lines: 60
+  l4_min_similarity: 0.3
+  l4_top_k: 10
+  level_weights: {L1: 1.0, L2: 0.8, L3: 0.5, L4: 0.3}
+
+snowflake:
+  schema: "COMPAREX_MEMORY"
+  # credentials come from environment variables or your standard connection config,
+  # never from this file
