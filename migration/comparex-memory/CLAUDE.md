@@ -24,7 +24,9 @@ The enterprise app pulls it from GitHub and Amp executes the prompts.
    the repo and the exact migration folder name if not obvious). If the folder name differs,
    update every reference to `migration/comparex-memory` in this kit:
    `grep -rl "migration/comparex-memory" . | xargs sed -i 's#migration/comparex-memory#<new path>#g'`
-2. **Verify**: `cd reference && pip install pyyaml pytest && python -m pytest -q` (13 tests pass).
+2. **Verify**: Python files are stored as `*.py.txt`; convert them first (commands in
+   `README.md`), then `cd reference && pip install pyyaml pytest && python -m pytest -q`
+   (13 tests pass). Keep them as `.py.txt` in the repo.
 3. **Commit and push** on a new branch (e.g. `add-comparex-memory-kit`) and open a pull request,
    unless the user asks to push directly. Do not modify anything else in their repo.
 4. **Optional, only if the user asks** (keep everything inside this folder):

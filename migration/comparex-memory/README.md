@@ -3,6 +3,26 @@
 Everything needed to add a memory layer to the Comparex pipeline: design, implementation
 guide, step-by-step prompts for Amp, tested reference code, templates, and the decision history.
 
+## First: convert the Python files back to `.py`
+
+Every Python file in this kit is stored as `<name>.py.txt` (for example
+`reference/comparex_memory/signature/hashing.py.txt`). Before running tests or using the
+reference code, remove the `.txt` ending from all of them. Run one of these from this folder
+(`migration/comparex-memory/`):
+
+PowerShell (Windows):
+```powershell
+Get-ChildItem -Recurse -Filter *.py.txt | Rename-Item -NewName { $_.Name -replace '\.txt$', '' }
+```
+
+Bash (macOS, Linux, Git Bash):
+```bash
+find . -name '*.py.txt' -exec sh -c 'mv "$1" "${1%.txt}"' _ {} \;
+```
+
+Afterwards there should be 18 `.py` files and no `.py.txt` files left. Nothing else in the
+kit needs renaming.
+
 **Two phased versions**
 - **Version 1, SQLite only** (`v1-sqlite/`): Phases 0–7, local memory, no Snowflake.
 - **Version 2, SQLite + Snowflake** (`v2-sqlite-snowflake/`): version 1 plus Phase 8, which
@@ -32,6 +52,7 @@ guide, step-by-step prompts for Amp, tested reference code, templates, and the d
 | `prototype/` | Earlier generic memory prototype (superseded, for reference) |
 
 ## Verify the reference code
+Convert the Python files first (see the top of this file), then:
 ```bash
 cd reference
 pip install pyyaml pytest

@@ -2,6 +2,9 @@
 
 The kit is at `migration/comparex-memory/` in the repo. Pick a version, then follow its run order.
 
+**Before anything else:** the Python files are stored as `*.py.txt`. Convert them back to
+`.py` with the one-line command at the top of `README.md`, before Amp reads `reference/`.
+
 | Version | Storage | When to choose it | Run order |
 | --- | --- | --- | --- |
 | 1 | SQLite only | One machine runs the memory layer; no Snowflake access needed yet | `v1-sqlite/START_HERE.md` |
