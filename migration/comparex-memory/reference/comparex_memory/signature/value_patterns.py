@@ -3,7 +3,7 @@
 Samples are used in memory only. Nothing here logs, stores or returns the values.
 """
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 _TRUE = {"1", "true", "t", "yes", "y"}
 _FALSE = {"0", "false", "f", "no", "n"}
@@ -17,17 +17,21 @@ def _num(x):
 
 
 def _dt(x):
+    """(datetime, extra_ns) or None. datetime holds up to microseconds; fractional digits
+    7-9 (SQL Server gives 7) are kept as extra_ns so 7->6 digit truncation stays visible."""
     if x is None:
         return None
     s = str(x).strip()
     if not s:
         return None
-    if "." in s:  # truncate fractional seconds beyond 6 digits (SQL Server gives 7)
+    extra_ns = 0
+    if "." in s:
         head, _, tail = s.partition(".")
         i = 0
         while i < len(tail) and tail[i].isdigit():
             i += 1
         digits, rest = tail[:i], tail[i:]
+        extra_ns = int(digits[6:9].ljust(3, "0"))
         s = f"{head}.{digits[:6]}{rest}" if digits else head + rest
     try:
         d = datetime.fromisoformat(s.replace("Z", "+00:00"))
@@ -41,7 +45,15 @@ def _dt(x):
                 continue
         if d is None:
             return None
-    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)), extra_ns
+
+
+def _diff_ns(a, b):
+    """Exact absolute difference in nanoseconds, or None if either side is not a datetime."""
+    pa, pb = _dt(a), _dt(b)
+    if pa is None or pb is None:
+        return None
+    return abs((pa[0] - pb[0]) // timedelta(microseconds=1) * 1000 + pa[1] - pb[1])
 
 
 def _both(a, b):
@@ -81,20 +93,18 @@ def boolean_equal(a, b, rule):
     return va is not None and va == vb
 
 
+_SECOND_NS = 1_000_000_000
+_HOUR_NS = 3600 * _SECOND_NS
+
+
 def datetime_whole_hours(a, b, rule):
-    da, db = _dt(a), _dt(b)
-    if da is None or db is None:
-        return False
-    diff = abs((da - db).total_seconds())
-    return diff > 0 and diff % 3600 == 0 and diff <= 14 * 3600
+    diff = _diff_ns(a, b)
+    return diff is not None and diff > 0 and diff % _HOUR_NS == 0 and diff <= 14 * _HOUR_NS
 
 
 def datetime_subsecond(a, b, rule):
-    da, db = _dt(a), _dt(b)
-    if da is None or db is None:
-        return False
-    diff = abs((da - db).total_seconds())
-    return 0 < diff < 1
+    diff = _diff_ns(a, b)
+    return diff is not None and 0 < diff < _SECOND_NS
 
 
 def numeric_close(a, b, rule):

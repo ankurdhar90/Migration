@@ -118,7 +118,7 @@
           <tr><td><code>leading_zeros</code></td><td><code>"00042"</code> → <code>"42"</code></td><td>A code stored as a number on one side</td></tr>
           <tr><td><code>boolean_repr</code></td><td><code>1</code> → <code>true</code></td><td>BIT vs BOOLEAN</td></tr>
           <tr><td><code>tz_shift</code></td><td><code>10:00</code> → <code>15:00</code></td><td>Whole-hour shift: a timezone conversion</td></tr>
-          <tr><td><code>fractional_seconds</code></td><td><code>…:00.1234567</code> → <code>…:00.123457</code></td><td>DATETIME2(7) rounded to microseconds</td></tr>
+          <tr><td><code>fractional_seconds</code></td><td><code>…:00.1234567</code> → <code>…:00.123457</code></td><td>DATETIME2(7) rounded or truncated to microseconds</td></tr>
           <tr><td><code>precision_loss</code></td><td><code>10.00004</code> → <code>10.0</code></td><td>Rounding in a DECIMAL or FLOAT conversion</td></tr>
           <tr><td><code>other</code></td><td>anything else</td><td>No rule reached 60%</td></tr>
         </tbody>
@@ -169,18 +169,18 @@ function normalizeObject(name) {
   return s.split(".").map(p => p.trim()).join(".");
 }
 function num(x) { const s = String(x ?? "").trim(); if (!s) return null; const n = Number(s); return Number.isFinite(n) ? n : null; }
-function dt(x) {  // microseconds since epoch, UTC, or null
+function dt(x) {  // nanoseconds since epoch as a BigInt, UTC, or null; digits beyond 9 ignored
   if (x == null) return null;
-  let s = String(x).trim();
+  const s = String(x).trim();
   if (!s) return null;
-  s = s.replace(/\.(\d+)/, (_, d) => "." + d.slice(0, 6));
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/);
   if (!m) return null;
   const [, y, mo, d, h = "0", mi = "0", se = "0", frac = "", tz] = m;
-  let us = Date.UTC(+y, +mo - 1, +d, +h, +mi, +se) * 1000 + Number(frac.padEnd(6, "0") || 0);
-  if (tz && tz !== "Z") { const sign = tz[0] === "-" ? -1 : 1; const t = tz.slice(1).replace(":", ""); us -= sign * (+t.slice(0, 2) * 60 + +t.slice(2)) * 60e6; }
-  return us;
+  let ns = BigInt(Date.UTC(+y, +mo - 1, +d, +h, +mi, +se)) * 1000000n + BigInt(frac.slice(0, 9).padEnd(9, "0"));
+  if (tz && tz !== "Z") { const sign = tz[0] === "-" ? -1n : 1n; const t = tz.slice(1).replace(":", ""); ns -= sign * BigInt(+t.slice(0, 2) * 60 + +t.slice(2)) * 60000000000n; }
+  return ns;
 }
+const absDiff = (x, y) => x > y ? x - y : y - x;
 const both = (a, b) => a !== null && b !== null;
 const TRUE = new Set(["1","true","t","yes","y"]), FALSE = new Set(["0","false","f","no","n"]);
 const bool = v => { v = String(v).trim().toLowerCase(); return TRUE.has(v) ? true : FALSE.has(v) ? false : null; };
@@ -191,8 +191,8 @@ const RULES = [
   ["unicode_normalization", (a, b) => both(a, b) && a.normalize("NFC") === b.normalize("NFC")],
   ["leading_zeros", (a, b) => { if (!both(a, b)) return false; a = a.trim(); b = b.trim(); return /^\d+$/.test(a) && /^\d+$/.test(b) && a.replace(/^0+/, "") === b.replace(/^0+/, ""); }],
   ["boolean_repr", (a, b) => { if (!both(a, b)) return false; const x = bool(a); return x !== null && x === bool(b); }],
-  ["tz_shift", (a, b) => { const x = dt(a), y = dt(b); if (x === null || y === null) return false; const d = Math.abs(x - y) / 1e6; return d > 0 && d % 3600 === 0 && d <= 14 * 3600; }],
-  ["fractional_seconds", (a, b) => { const x = dt(a), y = dt(b); if (x === null || y === null) return false; const d = Math.abs(x - y) / 1e6; return d > 0 && d < 1; }],
+  ["tz_shift", (a, b) => { const x = dt(a), y = dt(b); if (x === null || y === null) return false; const d = absDiff(x, y), hr = 3600000000000n; return d > 0n && d % hr === 0n && d <= 14n * hr; }],
+  ["fractional_seconds", (a, b) => { const x = dt(a), y = dt(b); if (x === null || y === null) return false; const d = absDiff(x, y); return d > 0n && d < 1000000000n; }],
   ["precision_loss", (a, b) => { const x = num(a), y = num(b); if (x === null || y === null) return false; const d = Math.abs(x - y); return d > 0 && d <= 0.0001 * Math.max(1, Math.abs(x)); }],
 ];
 function classify(samples, minShare = 0.6) {

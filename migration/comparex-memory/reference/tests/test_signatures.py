@@ -42,6 +42,17 @@ def test_rules_positive_and_negative():
         assert not fn(*neg, rule), kind
 
 
+def test_datetime_seven_digit_precision():
+    sub, hours = RULE_KINDS["datetime_subsecond"], RULE_KINDS["datetime_whole_hours"]
+    # SQL Server DATETIME2(7) truncated to 6 digits: 100 ns apart, still detected
+    assert sub("2026-08-01 10:00:00.1234567", "2026-08-01 10:00:00.123456", {})
+    # same instant written with a trailing zero is not a difference
+    assert not sub("2026-08-01 10:00:00.1234560", "2026-08-01 10:00:00.123456", {})
+    # a whole-hour shift with 7 digits on both sides is exact, not a rounding artifact
+    assert hours("2026-01-01 10:00:00.1234567", "2026-01-01 05:00:00.1234567", {})
+    assert not hours("2026-01-01 10:00:00.1234567", "2026-01-01 05:00:00.123456", {})
+
+
 def test_classify(cfg):
     vp = cfg["value_patterns"]
     assert classify([], vp) is None

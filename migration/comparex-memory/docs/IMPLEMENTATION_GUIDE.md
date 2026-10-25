@@ -853,7 +853,7 @@ Rule kinds (each is a function `(a, b, rule_cfg) -> bool`, and every rule requir
 | `datetime_subsecond` | both parse as datetimes; 0 < difference < 1 second |
 | `numeric_close` | both parse as numbers; 0 < abs(a − b) ≤ tolerance × max(1, abs(a)) |
 
-Datetime parsing: try `datetime.fromisoformat` (after replacing a trailing `Z` with `+00:00`), then formats `%Y-%m-%d %H:%M:%S.%f`, `%Y-%m-%d %H:%M:%S`. Treat naive datetimes as UTC. Truncate fractional seconds beyond 6 digits before parsing (SQL Server gives 7).
+Datetime parsing: try `datetime.fromisoformat` (after replacing a trailing `Z` with `+00:00`), then formats `%Y-%m-%d %H:%M:%S.%f`, `%Y-%m-%d %H:%M:%S`. Treat naive datetimes as UTC. Keep nanosecond precision: parse fractional digits 1–6 into the datetime and keep digits 7–9 as extra nanoseconds; ignore digits beyond 9. Compute differences as exact integer nanoseconds. This matters because SQL Server `DATETIME2(7)` gives 7 digits: if they were simply truncated to 6 before comparing, a value truncated to microseconds on the target (`.1234567` vs `.123456`, 100 ns apart) would look identical and fall through to `other`.
 
 ### 8.3 Hashing (`signature/hashing.py`)
 
@@ -899,6 +899,7 @@ class Signature:
 ### 8.5 Acceptance criteria and tests
 
 - [ ] Each rule kind has positive and negative unit tests, including `a == b` returning False.
+- [ ] `datetime_subsecond` detects a 7-digit value truncated to 6 digits, and does not fire for the same instant written as `.1234560` vs `.123456`.
 - [ ] `classify` respects order and `min_share`; returns `None` on empty input.
 - [ ] **Golden hash test:** a fixed `Signature` produces fixed L1/L2/L3 strings. Freeze the expected values in the test so any accidental change to hashing fails CI.
 - [ ] Same signature built twice → identical hashes; changing only `column_ref` changes L1 and L3 but not L2.
