@@ -11,7 +11,9 @@ Do not write or change any code in this phase.
 
 Study the existing build: how Comparex runs and stores results, how issue / triage / handoff
 MD files are produced and named, how Copilot CLI agents and Amp are invoked, the config
-system, DB and Snowflake access code, logging, CLI entry points, tests and scheduling.
+system, DB access code, logging, CLI entry points, tests and scheduling. This is version 1
+(SQLite only): note any existing Snowflake access code for version 2, but plan no Snowflake
+work now.
 
 Then write migration/comparex-memory/docs/ALIGNMENT.md with the six sections described in Phase 0: current build
 summary, component map (reuse / extend / add for every guide component, with file paths),

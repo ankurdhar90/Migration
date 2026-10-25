@@ -26,6 +26,10 @@ Hard constraints, apply to every task I give you:
 5. Output must be deterministic. Fix all random seeds.
 6. A file that fails to parse is logged to ingest_errors and skipped; never abort a run.
 7. Nothing about file formats is hard-coded; read it from memory_config.yaml.
+8. This is version 1: SQLite only (guide section 0.4). Add no Snowflake code, connection or
+   dependency, and leave snowflake.enabled false. Skip the Snowflake-only parts of the guide
+   (section 6.2 and section 13b). Keep updated_at on every table and keep the sync_state
+   table, so that version 2 can add Snowflake sync later without a schema change.
 
 We will start with Phase 0 (discovery and alignment, no code), then build in 7 phases.
 I will give you one phase at a time. For each phase:

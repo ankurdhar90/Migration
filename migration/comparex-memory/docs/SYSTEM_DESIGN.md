@@ -20,7 +20,7 @@ flowchart LR
   end
   P -- read-only --> G
   G --> DB[(SQLite .memory/memory.db)]
-  DB <-- sync --> SF[(Snowflake COMPAREX_MEMORY)]
+  DB <-- sync, version 2 only --> SF[(Snowflake COMPAREX_MEMORY)]
   R --> F[.memory/ISSUE-n.memory.md + memctl]
   F -. advisory .-> T
   F -. advisory .-> A
@@ -41,5 +41,8 @@ flowchart LR
 - **Integration** is one instruction line in the agents' instructions file. Nothing else in the
   pipeline changes.
 - **Stack:** Python, SQLite (local), Snowflake (shared, long-term). No LLM, no hosted models.
+- **Two phased versions.** Version 1 is SQLite only (Phases 0–7). Version 2 adds Snowflake sync
+  as one more phase (Phase 8) on top of a working version 1, behind `snowflake.enabled`.
+  Agents always read the local memory files, in both versions.
 
 Interactive version with diagram (claude.ai): https://claude.ai/artifact/HPECybMKZpVjEGofpW3sqz

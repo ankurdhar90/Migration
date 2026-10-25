@@ -32,8 +32,9 @@ Phase 0 — Discovery and alignment (before any code)
 9. Phase 3 — Ingestion
 10. Phase 4 — Outcomes, confidence, playbooks
 11. Phase 5 — Recall, memory file, CLI, agent hookup
-12. Phase 6 — Snowflake sync and scheduled jobs
+12. Phase 6 — Scheduled jobs
 13. Phase 7 — Evaluation (replay)
+13b. Phase 8 — Snowflake sync (version 2 only)
 14. Test fixtures strategy
 15. Definition of done
 16. Open decisions to confirm with the team
@@ -76,7 +77,7 @@ proposes is acceptable if it keeps all of them true.
 | CLI (11.4) | New `memctl` | An existing CLI entry point: add a `memory` subcommand group |
 | Logging, errors, tests | `logging`, pytest | Existing logging setup, error types, test framework and fixtures |
 | Scheduling (12.2) | cron / Task Scheduler | The scheduler that already runs Comparex |
-| Dependencies | stdlib, numpy, scikit-learn, pyyaml, snowflake-connector | Libraries already in the repo (e.g. pandas) may be used; avoid adding new ones |
+| Dependencies | stdlib, numpy, scikit-learn, pyyaml; snowflake-connector in version 2 only | Libraries already in the repo (e.g. pandas) may be used; avoid adding new ones |
 | Reference code (`reference/` in this kit) | Tested implementations of 6.1, 8.1–8.4, 9.2, 10.2 | Move or adapt into the layout chosen in Phase 0; keep the golden hash test unchanged |
 
 ### 0.3 Rules for touching existing code
@@ -89,6 +90,24 @@ proposes is acceptable if it keeps all of them true.
   reformat code it is not changing.
 - **When this guide and the existing build disagree, the existing build wins**, as long as the
   invariants in 0.1 still hold. Record the deviation in `ALIGNMENT.md`.
+
+### 0.4 Versions (phased rollout)
+
+The memory layer ships in two versions. Version 2 is version 1 plus one phase, so nothing is
+rebuilt when upgrading.
+
+| Version | Storage | Phases | Run order |
+| --- | --- | --- | --- |
+| 1 | SQLite only | 0–7 | `v1-sqlite/START_HERE.md` |
+| 2 | SQLite + Snowflake | 0–7, then 8 (section 13b) | `v2-sqlite-snowflake/START_HERE.md` |
+
+- **Version 1** adds no Snowflake code, connection or dependency. Sections 6.2 and 13b do not
+  apply. The config keeps `snowflake.enabled: false`.
+- **Version 1 stays ready for version 2:** every table keeps `updated_at` and the `sync_state`
+  table exists (unused in version 1), so version 2 needs no schema migration.
+- **Version 2** keeps SQLite as the store agents read from, and adds Snowflake as the shared,
+  long-term copy. With `snowflake.enabled: false`, version 2 behaves exactly like version 1.
+- The invariants in 0.1 apply to both versions.
 
 ---
 
@@ -113,9 +132,9 @@ Today every issue is solved from scratch. The **memory layer** gives agents the 
 These apply to every phase. They are repeated in Prompt 0.
 
 1. **Do not change the existing pipeline's behavior.** No edits to the MD files the pipeline produces, agent prompts, or Copilot CLI / Amp configuration (except the one instruction line in Phase 5, added by a human). Existing code may be *reused by import*; any change to existing code follows section 0.3 (proposed in `ALIGNMENT.md`, approved first, additive only).
-2. **Read-only on pipeline outputs.** The memory layer may only write inside `memory_dir` (default `.memory/`) and to the Snowflake memory schema. Enforce this with a single write-guard function (Phase 1) and a test.
+2. **Read-only on pipeline outputs.** The memory layer may only write inside `memory_dir` (default `.memory/`) and, in version 2 only, to the Snowflake memory schema. Enforce this with a single write-guard function (Phase 1) and a test.
 3. **No raw data values are stored.** Sample values from compare results may be used *in memory* to classify a value pattern, then discarded. Only labels and counts are persisted.
-4. **No LLM or hosted-model calls.** Prefer libraries already in the repo; otherwise the Python standard library, `numpy`, `scikit-learn`, `pyyaml`, `snowflake-connector-python`. Adding any other dependency needs approval.
+4. **No LLM or hosted-model calls.** Prefer libraries already in the repo; otherwise the Python standard library, `numpy`, `scikit-learn`, `pyyaml`, and in version 2 only `snowflake-connector-python`. Adding any other dependency needs approval.
 5. **Deterministic output.** Same inputs → same database rows → same memory file, byte for byte. No randomness without a fixed seed (`TruncatedSVD(random_state=42)`).
 6. **Never crash on one bad input.** A file that fails to parse is logged to `ingest_errors` and skipped.
 7. **Everything is configurable, nothing about file formats is hard-coded.** Paths, regexes, field locations, type maps and classifier rules live in configuration (`memory_config.yaml`, or a `memory` section in the repo's existing config system).
@@ -158,7 +177,7 @@ comparex_memory/
     __init__.py
     schema.sql           # SQLite DDL
     db.py                # connection, migrations, helpers
-    snowflake_sync.py    # push/pull (Phase 6)
+    snowflake_sync.py    # push/pull (Phase 8, version 2 only)
   ingest/
     __init__.py
     md_extractor.py      # generic Markdown field extraction
@@ -193,7 +212,7 @@ tests/
     make_fixture_repo.py
   test_*.py
 memory_config.yaml
-snowflake/ddl.sql
+snowflake/ddl.sql        # version 2 only
 pyproject.toml           # adds the `memctl` console script
 ```
 
@@ -341,7 +360,7 @@ snowflake:
 
 - The tables and columns below are the *information* memory needs. If the existing build already stores some of it (for example, Comparex already writes runs and differences to a database or Snowflake table), read from there instead of duplicating it, and record the mapping in `ALIGNMENT.md`.
 - All timestamps are UTC ISO-8601 strings: `2026-10-25T14:03:00Z`. Use `timeutil.now_iso()`.
-- Every table has `updated_at`. Snowflake sync (Phase 6) uses it as a watermark.
+- Every table has `updated_at`. Snowflake sync (Phase 8, version 2) uses it as a watermark, so keep it in version 1 too.
 - IDs: `issue_id` comes from the pipeline. Other IDs are deterministic via `db.stable_id(...)` (first 16 hex characters of a SHA-256), for example `resolution_id = stable_id(issue_id, first_commit_sha_or_handoff_file)`, so re-ingesting never creates duplicates.
 - Lists (e.g. `files_changed`) are stored as JSON text.
 
@@ -549,9 +568,9 @@ CREATE TABLE IF NOT EXISTS sync_state (
 
 > **Note vs. the design doc:** `compare_runs` and `run_differences` are added here. The design doc's verification step needs them to know which differences remain after a fix.
 
-### 6.2 Snowflake DDL (`snowflake/ddl.sql`)
+### 6.2 Snowflake DDL (`snowflake/ddl.sql`, version 2 only)
 
-Mirror every table above except `issues_fts`, `ingest_cursor`, `ingest_errors` and `sync_state` (local-only), and drop `text_vector` (rebuilt locally). Type mapping: `TEXT` → `STRING`, `INTEGER` → `NUMBER`, `REAL` → `FLOAT`, timestamps stay `STRING` in ISO format **or** use `TIMESTAMP_NTZ` and convert in the sync code (pick one and apply it to every table; `TIMESTAMP_NTZ` is recommended for querying). Primary keys are declared for documentation; Snowflake does not enforce them, so the sync uses `MERGE`.
+The generated starting point is `v2-sqlite-snowflake/snowflake/ddl.sql` in this kit. Mirror every table above except `issues_fts`, `ingest_cursor`, `ingest_errors` and `sync_state` (local-only), and drop `text_vector` (rebuilt locally). Type mapping: `TEXT` → `STRING`, `INTEGER` → `NUMBER`, `REAL` → `FLOAT`, timestamps stay `STRING` in ISO format **or** use `TIMESTAMP_NTZ` and convert in the sync code (pick one and apply it to every table; `TIMESTAMP_NTZ` is recommended for querying). Primary keys are declared for documentation; Snowflake does not enforce them, so the sync uses `MERGE`.
 
 Example for one table:
 
@@ -604,6 +623,10 @@ Hard constraints, apply to every task I give you:
 5. Output must be deterministic. Fix all random seeds.
 6. A file that fails to parse is logged to ingest_errors and skipped; never abort a run.
 7. Nothing about file formats is hard-coded; read it from memory_config.yaml.
+8. This is version 1: SQLite only (guide section 0.4). Add no Snowflake code, connection or
+   dependency, and leave snowflake.enabled false. Skip the Snowflake-only parts of the guide
+   (section 6.2 and section 13b). Keep updated_at on every table and keep the sync_state
+   table, so that version 2 can add Snowflake sync later without a schema change.
 
 We will start with Phase 0 (discovery and alignment, no code), then build in 7 phases.
 I will give you one phase at a time. For each phase:
@@ -648,8 +671,8 @@ system. This phase produces one document and no code.
    | Outcomes and playbooks (10) | | | |
    | Recall and memory file (11) | | | |
    | CLI (11.4) | | | |
-   | Snowflake sync (12) | | | |
-   | Scheduling (12.2) | | | |
+   | Scheduling (12.1) | | | |
+   | Snowflake sync (13b, version 2 only) | | | |
    | Tests and fixtures (14) | | | |
 
 3. **Proposed layout**: where the memory code will live and what each module is called,
@@ -671,7 +694,9 @@ Do not write or change any code in this phase.
 
 Study the existing build: how Comparex runs and stores results, how issue / triage / handoff
 MD files are produced and named, how Copilot CLI agents and Amp are invoked, the config
-system, DB and Snowflake access code, logging, CLI entry points, tests and scheduling.
+system, DB access code, logging, CLI entry points, tests and scheduling. This is version 1
+(SQLite only): note any existing Snowflake access code for version 2, but plan no Snowflake
+work now.
 
 Then write migration/comparex-memory/docs/ALIGNMENT.md with the six sections described in Phase 0: current build
 summary, component map (reuse / extend / add for every guide component, with file paths),
@@ -1275,7 +1300,7 @@ Rules:
 | `memctl playbook list [--status active]` | List playbooks |
 | `memctl playbook edit <playbook_id> --steps-file steps.md` | Human-edited steps (`edited_by_human = 1`) |
 | `memctl stats` | Counts, active playbooks, hit rate from Phase 7 |
-| `memctl sync push|pull` | Snowflake sync (Phase 6) |
+| `memctl sync push|pull` | Snowflake sync (Phase 8, version 2 only) |
 | `memctl jobs run <name>` | Run a scheduled job (Phase 6) |
 | `memctl eval` | Replay evaluation (Phase 7) |
 
@@ -1328,24 +1353,11 @@ run memctl recall on three real issues and show me the generated files.
 
 ---
 
-## 12. Phase 6 — Snowflake sync and scheduled jobs
+## 12. Phase 6 — Scheduled jobs
 
-**Why:** SQLite is fast and local, but one machine's memory dies with that machine and is invisible to other teams. Snowflake is the shared, long-term, governed copy. A new machine pulls from Snowflake and has the full history.
+**Why:** some memory changes with time alone: unverified fixes expire, confidence decays, facts go stale. These jobs keep the SQLite database current between ingest cycles. Both versions need them.
 
-### 12.1 Sync (`store/snowflake_sync.py`)
-
-- Connection: `snowflake.connector.connect(**params)` where params come from environment variables or your standard connection file. Never from `memory_config.yaml`, never logged.
-- **Synced tables:** `compare_runs`, `run_differences`, `issues` (without `text_vector`), `issue_signatures`, `resolutions`, `outcomes`, `playbooks`, `observations`, `entities`, `entity_facts`, `issue_entities`.
-- **Push** (`push(conn, sf, cfg)`), per table:
-  1. Select local rows with `updated_at > sync_state.last_pushed_at` (all rows if NULL).
-  2. `CREATE TEMPORARY TABLE <T>_STAGE LIKE COMPAREX_MEMORY.<T>`; insert in batches of 1,000 with `executemany`.
-  3. `MERGE INTO COMPAREX_MEMORY.<T> USING <T>_STAGE ON <primary key columns>`: update all columns when the stage row's `UPDATED_AT` is newer; insert when not matched.
-  4. Set `last_pushed_at` to the max `updated_at` pushed.
-- **Pull** (`pull(conn, sf, cfg)`), per table: rows with `UPDATED_AT > last_pulled_at`, upserted locally only if newer than the local row. Then rebuild the text index.
-- **Conflict rule:** `compare_runs`, `run_differences`, `resolutions`, `outcomes` and `issue_signatures` are effectively append-only (deterministic IDs). For everything else, the newest `updated_at` wins.
-- Run `push` at the end of every ingest cycle when Snowflake is configured; run `pull` at startup and with `memctl sync pull`.
-
-### 12.2 Scheduled jobs (`jobs.py`)
+### 12.1 Scheduled jobs (`jobs.py`)
 
 | Job name | Schedule | What it does |
 | --- | --- | --- |
@@ -1355,38 +1367,33 @@ run memctl recall on three real issues and show me the generated files.
 | `decay_facts` | Weekly | Pipeline-sourced facts not reconfirmed in 90 days: confidence × 0.9 (never below 0.3) |
 | `report` | Daily | Writes `memory_dir/report.md`: ingest errors, parse coverage, unlinked commits, outcome and playbook counts |
 
-Run them with cron, Windows Task Scheduler, or your existing scheduler: `memctl jobs run <name>`. If you prefer, `decay_facts` and `expire_unverified` can instead be Snowflake Tasks running the same SQL against `COMPAREX_MEMORY`; then disable the local versions so they do not run twice.
+Run them with cron, Windows Task Scheduler, or your existing scheduler: `memctl jobs run <name>`. Jobs read and write the local SQLite database only.
 
-### 12.3 Acceptance criteria and tests
+### 12.2 Acceptance criteria and tests
 
-- [ ] Unit tests for push/pull use a fake connector object that records SQL; assert MERGE statements and batch sizes.
-- [ ] Round trip on a test schema: ingest fixtures → push → empty local DB → pull → `memctl recall` output identical to before.
-- [ ] Credentials never appear in logs (test with a sentinel password string).
 - [ ] Each job has a test with a fixed `now`.
+- [ ] `report` output on the fixture repo matches a stored expected file.
+- [ ] Running every job twice with the same `now` gives the same database state (idempotent).
 
 ### Prompt for Amp — Phase 6
 
 ```text
-Implement Phase 6 (Snowflake sync and scheduled jobs) from
+Implement Phase 6 (Scheduled jobs) from
 migration/comparex-memory/docs/IMPLEMENTATION_GUIDE.md section 12.
 Follow migration/comparex-memory/docs/ALIGNMENT.md: reuse the existing code it names, use its layout and
 names instead of the defaults below, and adapt anything that conflicts with the existing
 build while keeping the invariants in section 0.1.
 
-Create comparex_memory/store/snowflake_sync.py, comparex_memory/jobs.py, the full
-snowflake/ddl.sql (every synced table from 6.1, mapped as described in 6.2), extend the CLI
-with `memctl sync push|pull` and `memctl jobs run <name>`, and write tests.
+Create comparex_memory/jobs.py, extend the CLI with `memctl jobs run <name>`, and write tests.
 
 Requirements:
-- Connection parameters only from environment variables or the standard Snowflake
-  connection config; never logged.
-- Push uses temporary stage tables + MERGE keyed on primary keys, batches of 1000, and the
-  sync_state watermarks. Pull upserts only newer rows, then rebuilds the text index.
-- Jobs exactly as in 12.2, each taking a `now` parameter.
-- Unit tests use a fake connector; add an optional integration test (skipped unless
-  COMPAREX_MEMORY_IT=1) that runs the round trip in 12.3 against a test schema.
+- Jobs exactly as in 12.1, each taking a `now` parameter.
+- Jobs run against the local SQLite database only. Do not add any Snowflake code,
+  connection or dependency (that is version 2, section 13b).
 
-Run tests and report. Do not run anything against production Snowflake.
+Write the tests in 12.2, run everything and report. Then propose the scheduler entries for
+`memctl ingest --watch` (or a cron cycle) and each job, using the scheduler that already runs
+Comparex.
 ```
 
 ---
@@ -1439,6 +1446,45 @@ backfill (read-only) and show me the report.
 
 ---
 
+## 13b. Phase 8 — Snowflake sync (version 2 only)
+
+**Why:** SQLite is fast and local, but one machine's memory dies with that machine and is invisible to other teams. Snowflake is the shared, long-term, governed copy. A new machine pulls from Snowflake and has the full history. Skip this section in version 1.
+
+**Before this phase:** version 1 (Phases 0–7) is complete, and the version 2 section of `ALIGNMENT.md` is approved (prompt `v2-sqlite-snowflake/prompts/00_snowflake_context.md`).
+
+### 13b.1 Sync (`store/snowflake_sync.py`)
+
+- Connection: `snowflake.connector.connect(**params)` where params come from environment variables or your standard connection file. Never from `memory_config.yaml`, never logged. Reuse an existing Snowflake connection module if the repo has one.
+- **Switch:** `snowflake.enabled` in the config. When false, no Snowflake code runs and `snowflake.connector` is never imported, so version 1 behavior is unchanged.
+- **Synced tables:** `compare_runs`, `run_differences`, `issues` (without `text_vector`), `issue_signatures`, `resolutions`, `outcomes`, `playbooks`, `observations`, `entities`, `entity_facts`, `issue_entities`.
+- **Push** (`push(conn, sf, cfg)`), per table:
+  1. Select local rows with `updated_at > sync_state.last_pushed_at` (all rows if NULL).
+  2. `CREATE TEMPORARY TABLE <T>_STAGE LIKE COMPAREX_MEMORY.<T>`; insert in batches of 1,000 with `executemany`.
+  3. `MERGE INTO COMPAREX_MEMORY.<T> USING <T>_STAGE ON <primary key columns>`: update all columns when the stage row's `UPDATED_AT` is newer; insert when not matched.
+  4. Set `last_pushed_at` to the max `updated_at` pushed.
+- **Pull** (`pull(conn, sf, cfg)`), per table: rows with `UPDATED_AT > last_pulled_at`, upserted locally only if newer than the local row. Then rebuild the text index.
+- **Conflict rule:** `compare_runs`, `run_differences`, `resolutions`, `outcomes` and `issue_signatures` are effectively append-only (deterministic IDs). For everything else, the newest `updated_at` wins.
+- When `snowflake.enabled` is true, run `push` at the end of every ingest cycle, and `pull` at startup and with `memctl sync pull`.
+- A failed push or pull is logged and retried on the next cycle. It never stops ingestion or recall: SQLite remains the source agents read from.
+
+### 13b.2 Optional: jobs as Snowflake Tasks
+
+`decay_facts` and `expire_unverified` (12.1) can instead be Snowflake Tasks running the same SQL against `COMPAREX_MEMORY`. If you do this, disable the local versions so they do not run twice.
+
+### 13b.3 Acceptance criteria and tests
+
+- [ ] Unit tests for push/pull use a fake connector object that records SQL; assert MERGE statements and batch sizes.
+- [ ] Round trip on a test schema: ingest fixtures → push → empty local DB → pull → `memctl recall` output identical to before.
+- [ ] Credentials never appear in logs (test with a sentinel password string).
+- [ ] With `snowflake.enabled: false`, every version 1 test passes and `snowflake.connector` is not imported.
+- [ ] A push that raises does not stop `run_cycle`; the next cycle pushes the same rows.
+
+### Prompt for Amp — Phase 8
+
+The prompt is `v2-sqlite-snowflake/prompts/01_phase8_snowflake_sync.md`. Send `v2-sqlite-snowflake/prompts/00_snowflake_context.md` first.
+
+---
+
 ## 14. Test fixtures strategy
 
 **Why:** real files are on the enterprise system and must not be copied into tests. A generator builds a small synthetic repo that exercises every rule.
@@ -1465,8 +1511,8 @@ Keep a table in the fixture module docstring mapping each scenario to the test t
 - [ ] Real backfill: ≥ 90% issue files parsed; every resolved issue has an outcome; evaluation report reviewed.
 - [ ] `migration/comparex-memory/docs/ASSUMPTIONS.md` and `FORMAT_NOTES.md` reviewed by the team.
 - [ ] The instruction line from 11.5 added by a human; Copilot and Amp confirmed reading memory files on a test issue.
-- [ ] Scheduler entries created for `memctl ingest --watch` (or a cron cycle) and the jobs in 12.2.
-- [ ] Snowflake schema created with role-based access; push/pull verified on a test schema first.
+- [ ] Scheduler entries created for `memctl ingest --watch` (or a cron cycle) and the jobs in 12.1.
+- [ ] Version 2 only: Snowflake schema created with role-based access; push/pull verified on a test schema first; `snowflake.enabled: true` in production.
 
 ---
 
@@ -1477,9 +1523,10 @@ Keep a table in the fixture module docstring mapping each scenario to the test t
 | Where memory files live | `.memory/` in the repo (add to `.gitignore`) | A shared path outside the repo; set `memory_dir` accordingly |
 | Verification window | 14 days | Shorter if Comparex runs daily on all pairs |
 | Reopen window | 30 days | Longer for tables compared rarely |
-| Ingester topology | One central ingester pushing to Snowflake | One per pipeline machine, all pushing (supported by the conflict rules) |
+| Version to start with | Version 1 (SQLite only), then version 2 when memory must be shared | Version 2 from the start, if Snowflake access is already approved |
+| Ingester topology (version 2) | One central ingester pushing to Snowflake | One per pipeline machine, all pushing (supported by the conflict rules) |
 | Do commits reference issue IDs? | Yes, with fallback linking | If rarely, ask Amp to report unlinked commits from the daily report and tune `fallback_window_hours` |
-| Timestamps in Snowflake | `TIMESTAMP_NTZ` | ISO strings |
+| Timestamps in Snowflake (version 2) | `TIMESTAMP_NTZ` | ISO strings |
 
 ---
 
@@ -1495,5 +1542,10 @@ Keep a table in the fixture module docstring mapping each scenario to the test t
 | 3b–d | Phase 3b–3d | Parse coverage on the real backfill |
 | 4 | Phase 4 | Outcome and playbook counts on real data |
 | 5 | Phase 5 | Three real memory files |
-| 6 | Phase 6 | Round trip on a test schema |
+| 6 | Phase 6 | Job tests; proposed scheduler entries |
 | 7 | Phase 7 | Evaluation report |
+| V2-0 | Version 2 context (`v2-sqlite-snowflake/prompts/00_snowflake_context.md`) | Version 2 section of `ALIGNMENT.md` (approve before continuing) |
+| V2-1 | Phase 8 (`v2-sqlite-snowflake/prompts/01_phase8_snowflake_sync.md`) | Version 1 tests still green; round trip on a test schema |
+
+Steps 0–7 are version 1. Version 2 adds the two V2 steps; the prompt files and run order for
+each version are in `v1-sqlite/` and `v2-sqlite-snowflake/`.

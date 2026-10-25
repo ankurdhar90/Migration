@@ -42,9 +42,13 @@ The enterprise app pulls it from GitHub and Amp executes the prompts.
 
 ## State at handoff
 - Done: design doc, implementation guide (with Phase 0 alignment and adapt-don't-rewrite rules),
-  prompts 00–08, reference code (schema, type map, value patterns, hashing, entity name
-  normalization, Markdown extractor, scoring) with 12 passing tests, Snowflake DDL generated
-  from the schema, templates, prototype.
-- Not done (by design, needs the enterprise codebase): everything in Phases 0–7 that touches
+  reference code (schema, type map, value patterns, hashing, entity name normalization,
+  Markdown extractor, scoring) with 12 passing tests, templates, prototype.
+- Kit placed in the repo at `migration/comparex-memory/` and pushed to `main`.
+- Split into two phased versions (guide section 0.4): `v1-sqlite/` (prompts 00–08, SQLite
+  only, Phase 6 is scheduled jobs) and `v2-sqlite-snowflake/` (version 1 plus a context prompt
+  and Phase 8 Snowflake sync, with the Snowflake DDL generated from the schema). Shared
+  `docs/`, `reference/` and `templates/` serve both.
+- Not done (by design, needs the enterprise codebase): everything in Phases 0–8 that touches
   real files, Comparex result formats, git history, scheduling and Snowflake credentials.
 - Open decisions: see `docs/SESSION_HISTORY.md`.

@@ -28,8 +28,8 @@ _Written by Amp in Phase 0. Approved by: ____ on ____._
 | Outcomes and playbooks (10) | | | |
 | Recall and memory file (11) | | | |
 | CLI (11.4) | | | |
-| Snowflake sync (12) | | | |
-| Scheduling (12.2) | | | |
+| Scheduling (12.1) | | | |
+| Snowflake sync (13b, version 2 only) | | | |
 | Tests and fixtures (14) | | | |
 
 ## 3. Proposed layout
@@ -43,3 +43,11 @@ _Written by Amp in Phase 0. Approved by: ____ on ____._
 | --- | --- | --- | --- |
 
 ## 6. Questions for the team
+
+## Version 2 (fill in only when adding Snowflake, prompt V2-0)
+- Existing Snowflake access code to reuse:
+- How credentials are provided today (never in this file):
+- Test schema and production schema:
+- Roles that need read / write access:
+- Proposed changes to existing code (exact diffs; prefer none):
+- Approved by: ____ on ____

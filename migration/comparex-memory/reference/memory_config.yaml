@@ -113,7 +113,8 @@ recall:
   l4_top_k: 10
   level_weights: {L1: 1.0, L2: 0.8, L3: 0.5, L4: 0.3}
 
-snowflake:
+snowflake:                            # version 2 only (guide section 13b)
+  enabled: false                      # version 1 keeps this false; nothing Snowflake runs
   schema: "COMPAREX_MEMORY"
   # credentials come from environment variables or your standard connection config,
   # never from this file
